@@ -3,6 +3,7 @@ import { Product } from '../models/Product';
 import { isSupabaseConfigured, requireSupabaseClient } from '../config/supabaseClient';
 import { ensureDatabaseFile, saveDatabase } from '../config/localDatabase';
 import { isValidUuid } from '../utils/uuid';
+import { HttpError } from '../middlewares/errorHandler';
 
 const mapProduct = (row: any): Product => ({
   id: row.id,
@@ -121,6 +122,9 @@ export const productRepository = {
     if (isSupabaseConfigured()) {
       if (!isValidUuid(id)) return false;
       const { error, count } = await requireSupabaseClient().from('products').delete({ count: 'exact' }).eq('id', id);
+      if (error?.code === '23503') {
+        throw new HttpError(409, 'Não é possível remover o produto porque ele está associado a pedidos.');
+      }
       if (error) throw error;
       return Boolean(count);
     }
@@ -128,6 +132,9 @@ export const productRepository = {
     const products = findAllLocal();
     const index = products.findIndex((product) => product.id === id);
     if (index === -1) return false;
+    if (ensureDatabaseFile().orders.some((order) => order.items.some((item) => item.productId === id))) {
+      throw new HttpError(409, 'Não é possível remover o produto porque ele está associado a pedidos.');
+    }
 
     products.splice(index, 1);
     persistLocal(products);

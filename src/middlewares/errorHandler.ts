@@ -20,7 +20,16 @@ export const errorHandler = (error: unknown, _req: Request, res: Response, _next
     return;
   }
 
-  const message = error instanceof Error ? error.message : 'Erro interno do servidor.';
+  if (error && typeof error === 'object' && 'status' in error && typeof error.status === 'number' && error.status >= 400 && error.status < 500) {
+    const message = 'type' in error && error.type === 'entity.parse.failed'
+      ? 'O corpo da requisição contém JSON inválido.'
+      : error.status === 413
+        ? 'O corpo da requisição excede o limite permitido.'
+        : 'A requisição é inválida.';
+    res.status(error.status).json({ message });
+    return;
+  }
+
   console.error('Erro não tratado:', error);
-  res.status(500).json({ message });
+  res.status(500).json({ message: 'Erro interno do servidor.' });
 };

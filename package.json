@@ -2,12 +2,14 @@
   "name": "pastifico-api",
   "version": "1.0.0",
   "description": "Pastifico - sistema de autoatendimento para restaurante de massas italianas em Node.js + TypeScript",
+  "author": "Leonardo Hamilton Moreira de Camargo",
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
     "test": "tsx --test",
+    "test:coverage": "node --import tsx --test --experimental-test-coverage --test-coverage-lines=60 tests/**/*.test.ts",
     "migrate:supabase": "tsx scripts/migrate-json-to-supabase.ts"
   },
   "keywords": [
@@ -19,7 +21,6 @@
     "italian-food",
     "pastifico"
   ],
-  "author": "",
   "license": "MIT",
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",

@@ -6,7 +6,11 @@ const getClient = (): SupabaseClient | null => {
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  if (!url || !key) return null;
+  if (!url && !key) return null;
+  if (!url || !key) {
+    throw new Error('Defina SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY juntas, ou remova ambas para usar o banco local.');
+  }
+
   client ??= createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
   return client;
 };

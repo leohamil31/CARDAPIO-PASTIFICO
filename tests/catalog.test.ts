@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import request from 'supertest';
 
 import { app } from '../src/app';
+import { isSupabaseConfigured } from '../src/config/supabaseClient';
 import { ensureDatabaseFile, saveDatabase } from '../src/config/localDatabase';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -16,6 +17,28 @@ const originalLocalDatabase = fs.readFileSync(localDatabasePath, 'utf8');
 
 after(() => {
   fs.writeFileSync(localDatabasePath, originalLocalDatabase, 'utf8');
+});
+
+test('partial Supabase credentials fail explicitly instead of falling back to local JSON', () => {
+  const originalUrl = process.env.SUPABASE_URL;
+  const originalKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  process.env.SUPABASE_URL = 'https://example.supabase.co';
+  process.env.SUPABASE_SERVICE_ROLE_KEY = '';
+
+  try {
+    assert.throws(() => isSupabaseConfigured(), /Defina SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY juntas/);
+  } finally {
+    process.env.SUPABASE_URL = originalUrl;
+    process.env.SUPABASE_SERVICE_ROLE_KEY = originalKey;
+  }
+});
+
+test('GET /api/health reports the active local persistence mode', async () => {
+  const response = await request(app).get('/api/health');
+
+  assert.equal(response.status, 200);
+  assert.equal(response.body.persistence, 'local-json');
+  assert.equal(response.body.database, 'local-json');
 });
 
 test('ensureDatabaseFile sanitizes duplicated or stale catalog entries', () => {
@@ -129,6 +152,27 @@ test('DELETE /categories/:id removes a category', async () => {
   assert.equal(showResponse.status, 404);
 });
 
+test('DELETE /categories/:id returns 409 when products still use the category', async () => {
+  const categoryResponse = await request(app).post('/categories').send({
+    name: 'Categoria vinculada - teste',
+    description: 'Não deve ser removida enquanto tiver produtos.'
+  });
+  const productResponse = await request(app).post('/products').send({
+    name: 'Produto vinculado à categoria - teste',
+    description: 'Produto para testar integridade referencial.',
+    price: 10,
+    image: '/produto-vinculado.jpg',
+    isAvailable: true,
+    categoryId: categoryResponse.body.id
+  });
+
+  assert.equal(productResponse.status, 201);
+  const response = await request(app).delete(`/categories/${categoryResponse.body.id}`);
+
+  assert.equal(response.status, 409);
+  assert.match(response.body.message, /possui produtos/i);
+});
+
 test('GET /products returns a list of products', async () => {
   const response = await request(app).get('/products');
 
@@ -152,6 +196,21 @@ test('POST /products creates a new product with a UUID id', async () => {
   assert.equal(response.status, 201);
   assert.equal(response.body.name, 'Penne al Pomodoro - teste');
   assert.match(response.body.id, /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+});
+
+test('POST /products reuses an existing product with the same name', async () => {
+  const [existingProduct] = (await request(app).get('/products')).body;
+  const response = await request(app).post('/products').send({
+    name: existingProduct.name,
+    description: 'Descrição enviada para validar duplicidade.',
+    price: 99,
+    image: existingProduct.image,
+    isAvailable: true,
+    categoryId: existingProduct.categoryId
+  });
+
+  assert.equal(response.status, 201);
+  assert.equal(response.body.id, existingProduct.id);
 });
 
 test('POST /orders creates a new order with status Recebido', async () => {
@@ -273,6 +332,29 @@ test('DELETE /products/:id removes a product', async () => {
   assert.equal(showResponse.status, 404);
 });
 
+test('DELETE /products/:id returns 409 when order history references the product', async () => {
+  const categoriesResponse = await request(app).get('/categories');
+  const categoryId = categoriesResponse.body[0].id;
+  const productResponse = await request(app).post('/products').send({
+    name: 'Produto vinculado a pedido - teste',
+    description: 'Produto para testar integridade referencial.',
+    price: 10,
+    image: '/produto-em-pedido.jpg',
+    isAvailable: true,
+    categoryId
+  });
+  await request(app).post('/orders').send({
+    customerName: 'Cliente de teste',
+    tableNumber: 7,
+    items: [{ productId: productResponse.body.id, quantity: 1 }]
+  });
+
+  const response = await request(app).delete(`/products/${productResponse.body.id}`);
+
+  assert.equal(response.status, 409);
+  assert.match(response.body.message, /associado a pedidos/i);
+});
+
 test('GET /orders/kitchen returns pending orders for the kitchen panel', async () => {
   const response = await request(app).get('/orders/kitchen');
 
@@ -299,4 +381,98 @@ test('GET /unknown-route returns a JSON 404 through the central error handler', 
 
   assert.equal(response.status, 404);
   assert.ok(response.body.message);
+});
+
+test('malformed JSON returns a JSON 400 response', async () => {
+  const response = await request(app)
+    .post('/orders')
+    .set('Content-Type', 'application/json')
+    .send('{"customerName":');
+
+  assert.equal(response.status, 400);
+  assert.match(response.body.message, /JSON inválido/i);
+});
+
+test('resource endpoints reject malformed UUIDs with 400', async () => {
+  const responses = await Promise.all([
+    request(app).get('/categories/not-a-uuid'),
+    request(app).put('/categories/not-a-uuid').send({ name: 'Alterada' }),
+    request(app).delete('/categories/not-a-uuid'),
+    request(app).get('/products/not-a-uuid'),
+    request(app).put('/products/not-a-uuid').send({ name: 'Alterado' }),
+    request(app).delete('/products/not-a-uuid'),
+    request(app).get('/orders/not-a-uuid'),
+    request(app).patch('/orders/not-a-uuid/status').send({ status: 'Pronto' }),
+    request(app).delete('/orders/not-a-uuid')
+  ]);
+
+  assert.ok(responses.every((response) => response.status === 400));
+  assert.ok(responses.every((response) => typeof response.body.message === 'string'));
+});
+
+test('category and product creation reject malformed payload fields', async () => {
+  const categoryResponse = await request(app).post('/categories').send({ name: 7, description: 'Inválido' });
+  const productResponse = await request(app).post('/products').send({
+    name: 'Produto inválido',
+    description: 'Preço não numérico',
+    price: 'grátis',
+    image: '/produto.jpg',
+    isAvailable: true,
+    categoryId: '00000000-0000-0000-0000-000000000000'
+  });
+
+  assert.equal(categoryResponse.status, 400);
+  assert.equal(productResponse.status, 400);
+});
+
+test('product updates reject empty and unknown fields', async () => {
+  const productsResponse = await request(app).get('/products');
+  const productId = productsResponse.body[0].id;
+
+  const emptyResponse = await request(app).put(`/products/${productId}`).send({});
+  const unknownFieldResponse = await request(app).put(`/products/${productId}`).send({ unexpected: true });
+
+  assert.equal(emptyResponse.status, 400);
+  assert.equal(unknownFieldResponse.status, 400);
+});
+
+test('POST /orders rejects malformed item shapes and invalid add-ons', async () => {
+  const productsResponse = await request(app).get('/products');
+  const product = productsResponse.body.find((item: { name: string }) => item.name === 'Spaghetti Carbonara');
+
+  const malformedItemResponse = await request(app).post('/orders').send({
+    customerName: 'Cliente',
+    tableNumber: 2,
+    items: [null]
+  });
+  const invalidOptionResponse = await request(app).post('/orders').send({
+    customerName: 'Cliente',
+    tableNumber: 2,
+    items: [{ productId: product.id, quantity: 1, options: ['Adicional inexistente'] }]
+  });
+  const inheritedOptionResponse = await request(app).post('/orders').send({
+    customerName: 'Cliente',
+    tableNumber: 2,
+    items: [{ productId: product.id, quantity: 1, options: ['toString'] }]
+  });
+
+  assert.equal(malformedItemResponse.status, 400);
+  assert.equal(invalidOptionResponse.status, 400);
+  assert.equal(inheritedOptionResponse.status, 400);
+});
+
+test('order lookup and table routes validate identifiers and numbers', async () => {
+  const productsResponse = await request(app).get('/products');
+  const product = productsResponse.body.find((item: { name: string }) => item.name === 'Spaghetti Carbonara');
+  const createResponse = await request(app).post('/orders').send({
+    customerName: 'Cliente',
+    tableNumber: 5,
+    items: [{ productId: product.id }]
+  });
+  const orderResponse = await request(app).get(`/orders/${createResponse.body.id}`);
+  const invalidTableResponse = await request(app).get('/orders/table/2.5');
+
+  assert.equal(orderResponse.status, 200);
+  assert.equal(orderResponse.body.id, createResponse.body.id);
+  assert.equal(invalidTableResponse.status, 400);
 });

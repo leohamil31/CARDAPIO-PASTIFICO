@@ -3,6 +3,7 @@ import { Category } from '../models/Category';
 import { isSupabaseConfigured, requireSupabaseClient } from '../config/supabaseClient';
 import { ensureDatabaseFile, saveDatabase } from '../config/localDatabase';
 import { isValidUuid } from '../utils/uuid';
+import { HttpError } from '../middlewares/errorHandler';
 
 const mapCategory = (row: any): Category => ({
   id: row.id,
@@ -89,6 +90,9 @@ export const categoryRepository = {
     if (isSupabaseConfigured()) {
       if (!isValidUuid(id)) return false;
       const { error, count } = await requireSupabaseClient().from('categories').delete({ count: 'exact' }).eq('id', id);
+      if (error?.code === '23503') {
+        throw new HttpError(409, 'Não é possível remover a categoria porque ela ainda possui produtos.');
+      }
       if (error) throw error;
       return Boolean(count);
     }
@@ -96,6 +100,9 @@ export const categoryRepository = {
     const categories = findAllLocal();
     const index = categories.findIndex((category) => category.id === id);
     if (index === -1) return false;
+    if (ensureDatabaseFile().products.some((product) => product.categoryId === id)) {
+      throw new HttpError(409, 'Não é possível remover a categoria porque ela ainda possui produtos.');
+    }
 
     categories.splice(index, 1);
     persistLocal(categories);
