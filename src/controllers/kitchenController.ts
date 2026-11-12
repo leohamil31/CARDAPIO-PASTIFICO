@@ -9,7 +9,7 @@ export const listKitchenOrders = asyncHandler(async (_req: Request, res: Respons
 export const listTableOrders = asyncHandler(async (req: Request, res: Response): Promise<void> => {
   const tableNumber = Number(req.params.tableNumber);
 
-  if (Number.isNaN(tableNumber)) {
+  if (!Number.isInteger(tableNumber) || tableNumber < 1) {
     res.status(400).json({ message: 'Número da mesa é inválido.' });
     return;
   }

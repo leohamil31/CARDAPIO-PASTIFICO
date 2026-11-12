@@ -4,6 +4,13 @@ import { isSupabaseConfigured, requireSupabaseClient } from '../config/supabaseC
 import { ensureDatabaseFile, saveDatabase } from '../config/localDatabase';
 import { productRepository } from './productRepository';
 import { isValidUuid } from '../utils/uuid';
+import { HttpError } from '../middlewares/errorHandler';
+
+interface OrderItemInput {
+  productId: string;
+  quantity?: number;
+  options?: string[];
+}
 
 const foodOptionPrices: Record<string, number> = {
   'Molho extra da casa': 4,
@@ -27,28 +34,32 @@ const getAuthoritativeItemPrice = (productName: string, basePrice: number, optio
   let price = basePrice;
 
   if (wineProductNames.has(productName)) {
-    if (options.some((option) => !['Taça de vinho', 'Garrafa de vinho'].includes(option))) throw new Error('Adicional inválido para vinho.');
+    if (options.some((option) => !['Taça de vinho', 'Garrafa de vinho'].includes(option))) throw new HttpError(400, 'Adicional inválido para vinho.');
     if (options.includes('Taça de vinho')) price = 18;
     return price;
   }
 
   if (sodaProductNames.has(productName)) {
     const allowed = ['Lata 350 ml', 'Garrafa 600 ml', 'Copo com gelo', 'Com limão', 'Com laranja'];
-    if (options.some((option) => !allowed.includes(option))) throw new Error('Adicional inválido para refrigerante.');
+    if (options.some((option) => !allowed.includes(option))) throw new HttpError(400, 'Adicional inválido para refrigerante.');
     if (options.includes('Lata 350 ml')) price = 7.5;
     return price + (options.includes('Copo com gelo') ? 1.5 : 0) + (options.includes('Com limão') ? 1 : 0) + (options.includes('Com laranja') ? 1 : 0);
   }
 
   if (dessertProductNames.has(productName)) {
     const extras = options.reduce((total, option) => {
-      if (!(option in dessertOptionPrices)) throw new Error('Adicional de sobremesa inválido.');
+      if (!Object.prototype.hasOwnProperty.call(dessertOptionPrices, option)) {
+        throw new HttpError(400, 'Adicional de sobremesa inválido.');
+      }
       return total + dessertOptionPrices[option];
     }, 0);
     return price + extras;
   }
 
   const extras = options.reduce((total, option) => {
-    if (!(option in foodOptionPrices)) throw new Error('Adicional de prato inválido.');
+    if (!Object.prototype.hasOwnProperty.call(foodOptionPrices, option)) {
+      throw new HttpError(400, 'Adicional de prato inválido.');
+    }
     return total + foodOptionPrices[option];
   }, 0);
   return price + extras;
@@ -81,14 +92,18 @@ const persistLocal = (orders: Order[]): void => {
   saveDatabase({ ...db, orders });
 };
 
-const buildOrderItems = async (items: any[]): Promise<OrderItem[]> => Promise.all(items.map(async (item) => {
-  const quantity = Number(item.quantity ?? 1);
-  if (!Number.isInteger(quantity) || quantity < 1) throw new Error('A quantidade do item deve ser um inteiro maior que zero.');
+const buildOrderItems = async (items: OrderItemInput[]): Promise<OrderItem[]> => Promise.all(items.map(async (item) => {
+  const quantity = item.quantity ?? 1;
+  if (!Number.isInteger(quantity) || quantity < 1) throw new HttpError(400, 'A quantidade do item deve ser um inteiro maior que zero.');
+  if (!isValidUuid(item.productId)) throw new HttpError(400, 'O id do produto deve ser um UUID válido.');
 
-  const product = await productRepository.findById(String(item.productId ?? ''));
-  if (!product || !product.isAvailable) throw new Error('Produto não encontrado ou indisponível.');
+  const product = await productRepository.findById(item.productId);
+  if (!product || !product.isAvailable) throw new HttpError(400, 'Produto não encontrado ou indisponível.');
 
-  const options = Array.isArray(item.options) ? item.options.filter((option: unknown): option is string => typeof option === 'string') : [];
+  const options = item.options ?? [];
+  if (!Array.isArray(options) || !options.every((option) => typeof option === 'string')) {
+    throw new HttpError(400, 'Os adicionais do item devem ser uma lista de textos.');
+  }
   const unitPrice = getAuthoritativeItemPrice(product.name, product.price, options);
   const subtotal = quantity * unitPrice;
 
@@ -133,7 +148,7 @@ export const orderRepository = {
     return orders.filter((order) => order.tableNumber === tableNumber);
   },
 
-  async create(customerName: string, tableNumber: number, items: any[], paymentMethod: PaymentMethod = 'Dinheiro'): Promise<Order> {
+  async create(customerName: string, tableNumber: number, items: OrderItemInput[], paymentMethod: PaymentMethod = 'Dinheiro'): Promise<Order> {
     const orderItems = await buildOrderItems(items);
     const total = orderItems.reduce((sum, item) => sum + item.subtotal, 0);
     const paymentStatus: PaymentStatus = 'Aguardando no caixa';

@@ -28,7 +28,7 @@
         {
           "name": "Listar categorias",
           "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/categories" },
-          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["if (pm.response.code === 200) {", "  const categories = pm.response.json();", "  if (Array.isArray(categories) && categories.length) {", "    pm.collectionVariables.set('categoryId', categories[0].id);", "  }", "}"] } }]
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["if (pm.response.code === 200) {", "  const categories = pm.response.json();", "  if (Array.isArray(categories) && categories.length) {", "    const id = categories[0].id;", "    pm.collectionVariables.set('categoryId', id);", "    if (pm.environment.get('categoryId') !== undefined && pm.environment.get('categoryId') !== null) {", "      pm.environment.set('categoryId', id);", "    }", "  }", "}"] } }]
         },
         {
           "name": "Buscar categoria por ID",
@@ -43,7 +43,7 @@
             "url": "{{baseUrl}}/categories",
             "description": "A resposta inclui o ID (uuid); o script de teste salva automaticamente em categoryId."
           },
-          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["if (pm.response.code === 201) {", "  const category = pm.response.json();", "  if (category.id) {", "    pm.collectionVariables.set('categoryId', category.id);", "  }", "}"] } }]
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["if (pm.response.code === 201) {", "  const category = pm.response.json();", "  if (category.id) {", "    pm.collectionVariables.set('categoryId', category.id);", "    if (pm.environment.get('categoryId') !== undefined && pm.environment.get('categoryId') !== null) {", "      pm.environment.set('categoryId', category.id);", "    }", "  }", "}"] } }]
         },
         {
           "name": "Atualizar categoria",
@@ -56,7 +56,12 @@
         },
         {
           "name": "Remover categoria",
-          "request": { "method": "DELETE", "header": [], "url": "{{baseUrl}}/categories/{{categoryId}}" }
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/categories/{{categoryId}}",
+            "description": "Para receber 204, use uma categoria sem produtos associados (por exemplo, rode 'Criar categoria' imediatamente antes). Categorias com produtos retornam 409."
+          }
         }
       ]
     },
@@ -66,7 +71,7 @@
         {
           "name": "Listar produtos",
           "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/products" },
-          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["if (pm.response.code === 200) {", "  const products = pm.response.json();", "  if (Array.isArray(products) && products.length) {", "    pm.collectionVariables.set('productId', products[0].id);", "  }", "}"] } }]
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["if (pm.response.code === 200) {", "  const products = pm.response.json();", "  if (Array.isArray(products) && products.length) {", "    const id = products[0].id;", "    pm.collectionVariables.set('productId', id);", "    if (pm.environment.get('productId') !== undefined && pm.environment.get('productId') !== null) {", "      pm.environment.set('productId', id);", "    }", "  }", "}"] } }]
         },
         {
           "name": "Buscar produto por ID",
@@ -81,7 +86,7 @@
             "url": "{{baseUrl}}/products",
             "description": "Rode antes 'Listar categorias' (ou 'Criar categoria') para preencher {{categoryId}}. A resposta inclui o ID; o script de teste salva automaticamente em productId."
           },
-          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["if (pm.response.code === 201) {", "  const product = pm.response.json();", "  if (product.id) {", "    pm.collectionVariables.set('productId', product.id);", "  }", "}"] } }]
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["if (pm.response.code === 201) {", "  const product = pm.response.json();", "  if (product.id) {", "    pm.collectionVariables.set('productId', product.id);", "    if (pm.environment.get('productId') !== undefined && pm.environment.get('productId') !== null) {", "      pm.environment.set('productId', product.id);", "    }", "  }", "}"] } }]
         },
         {
           "name": "Atualizar produto",
@@ -94,7 +99,12 @@
         },
         {
           "name": "Remover produto",
-          "request": { "method": "DELETE", "header": [], "url": "{{baseUrl}}/products/{{productId}}" }
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/products/{{productId}}",
+            "description": "Para receber 204, use um produto sem pedidos associados (por exemplo, rode 'Criar produto' e não o inclua em pedidos). Produtos presentes no histórico retornam 409."
+          }
         }
       ]
     },
@@ -118,7 +128,7 @@
             "url": "{{baseUrl}}/orders",
             "description": "Rode antes 'Listar produtos' (ou 'Criar produto') para preencher {{productId}}."
           },
-          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["if (pm.response.code === 201) {", "  const order = pm.response.json();", "  if (order.id) {", "    pm.collectionVariables.set('orderId', order.id);", "  }", "}"] } }]
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["if (pm.response.code === 201) {", "  const order = pm.response.json();", "  if (order.id) {", "    pm.collectionVariables.set('orderId', order.id);", "    if (pm.environment.get('orderId') !== undefined && pm.environment.get('orderId') !== null) {", "      pm.environment.set('orderId', order.id);", "    }", "  }", "}"] } }]
         },
         {
           "name": "Atualizar status do pedido",

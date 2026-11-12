@@ -164,7 +164,8 @@ SUPABASE_SERVICE_ROLE_KEY=
 ```
 
 - Se **ambas** estiverem vazias, a API usa automaticamente o arquivo local `data/pastifico-db.json` para persistir os dados.
-- Se **ambas** estiverem preenchidas com as credenciais do seu projeto Supabase, a API passa a usar o Supabase/PostgreSQL.
+- Se **ambas** estiverem preenchidas com as credenciais do seu projeto Supabase, a API passa a usar o Supabase/PostgreSQL. O health check consulta `categories` e retorna `database: "connected"` se conseguir acessar as tabelas; falhas de conexão ou schema retornam HTTP 503 e `database: "unavailable"`.
+- Se apenas uma das duas variáveis estiver preenchida, a API retorna erro de configuração em vez de trocar silenciosamente para o banco local.
 
 **Importante:** o arquivo `.env` com as credenciais reais nunca é enviado ao Git (está listado no `.gitignore`). Apenas o `.env.example`, com os nomes das variáveis vazios, é versionado.
 
@@ -178,6 +179,8 @@ O banco utiliza 4 tabelas no PostgreSQL (Supabase), criadas pelo script [`supaba
 - `order_items` (`id uuid`, `order_id uuid → orders.id`, `product_id uuid → products.id`, `name`, `quantity`, `unit_price`, `subtotal`, `options`)
 
 Todas as chaves primárias usam `uuid` (gerado com `gen_random_uuid()`), e as relações entre `products → categories`, `order_items → orders` e `order_items → products` são implementadas com chaves estrangeiras (Foreign Key).
+
+As chaves estrangeiras impedem remover categorias que ainda possuem produtos ou produtos já referenciados no histórico de pedidos. Nesses casos, a API responde `409 Conflict`; os itens de pedido são removidos em cascata quando um pedido é excluído.
 
 Para reproduzir a estrutura em um projeto Supabase novo:
 
@@ -229,7 +232,7 @@ Caso precise recomeçar do zero em um projeto Supabase já existente, use [`supa
 
 | Método | Endpoint | Descrição |
 |---|---|---|
-| GET | `/api/health` | Retorna status da API e o tipo de persistência ativa (`supabase` ou `local-json`) |
+| GET | `/api/health` | Retorna status da API, persistência (`supabase` ou `local-json`) e conectividade com o banco |
 
 ## 10. Exemplos de requisições
 
@@ -294,9 +297,14 @@ Caso precise recomeçar do zero em um projeto Supabase já existente, use [`supa
 ```powershell
 npm run build
 npm test
+npm run test:coverage
 ```
 
-Os testes automatizados usam sempre o armazenamento local (`data/pastifico-db.json`) e não se conectam ao Supabase, mesmo que o `.env` esteja configurado.
+Os testes automatizados usam sempre o armazenamento local (`data/pastifico-db.json`) e não se conectam ao Supabase, mesmo que o `.env` esteja configurado. O comando `test:coverage` gera o relatório nativo de cobertura do Node.js e falha caso a cobertura de linhas fique abaixo de 60%.
+
+## Documentação da API
+
+A especificação dos endpoints e exemplos de payloads estão neste README. A coleção e o ambiente Postman em `postman/` permitem executar as requisições e são mantidos junto ao código. Este projeto não inclui Swagger/OpenAPI interativo; adicione-o somente se a rubrica da disciplina exigir explicitamente uma documentação OpenAPI servida pela aplicação.
 
 ## Testar no Postman
 
@@ -308,6 +316,8 @@ Os testes automatizados usam sempre o armazenamento local (`data/pastifico-db.js
 4. Teste primeiro `Sistema → Health check`; a resposta esperada é `200 OK`.
 5. Rode `Categorias → Listar categorias` e `Produtos → Listar produtos` para capturar automaticamente os ids (uuid) reais nas variáveis `categoryId` e `productId` da coleção.
 6. A partir daí, as demais requisições (criar, atualizar, remover produto/categoria/pedido) já funcionam usando esses ids capturados automaticamente pelos scripts de teste de cada requisição.
+
+Os scripts salvam os ids tanto na coleção quanto no ambiente ativo, evitando que os valores vazios do ambiente sobrescrevam os ids recém-capturados.
 
 ## Observação sobre pagamentos
 

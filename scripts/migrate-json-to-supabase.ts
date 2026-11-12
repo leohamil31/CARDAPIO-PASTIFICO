@@ -43,6 +43,8 @@ const run = async (): Promise<void> => {
       table_number: order.tableNumber,
       status: order.status,
       total: order.total,
+      payment_method: order.paymentMethod ?? 'Dinheiro',
+      payment_status: order.paymentStatus ?? 'Aguardando no caixa',
       created_at: order.createdAt
     });
     if (orderResult.error) throw orderResult.error;

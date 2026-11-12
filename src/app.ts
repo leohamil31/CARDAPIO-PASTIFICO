@@ -5,7 +5,7 @@ import categoryRoutes from './routes/categoryRoutes';
 import productRoutes from './routes/productRoutes';
 import orderRoutes from './routes/orderRoutes';
 import kitchenRoutes from './routes/kitchenRoutes';
-import { isSupabaseConfigured } from './config/supabaseClient';
+import { isSupabaseConfigured, requireSupabaseClient } from './config/supabaseClient';
 import { notFoundHandler, errorHandler } from './middlewares/errorHandler';
 
 const app = express();
@@ -14,11 +14,30 @@ const publicDir = path.join(process.cwd(), 'public');
 app.use(express.json());
 app.use(express.static(publicDir));
 
-app.get('/api/health', (_req, res) => {
+app.get('/api/health', async (_req, res) => {
+  const supabaseConfigured = isSupabaseConfigured();
+  let database = 'local-json';
+
+  if (supabaseConfigured) {
+    const { error } = await requireSupabaseClient().from('categories').select('id').limit(1);
+    if (error) {
+      console.error('Falha no health check do Supabase:', error);
+      res.status(503).json({
+        name: 'Pastifico API',
+        message: 'A API iniciou, mas não conseguiu acessar o banco Supabase.',
+        persistence: 'supabase',
+        database: 'unavailable'
+      });
+      return;
+    }
+    database = 'connected';
+  }
+
   res.status(200).json({
     name: 'Pastifico API',
     message: 'API de autoatendimento do restaurante Pastifico',
-    persistence: isSupabaseConfigured() ? 'supabase' : 'local-json',
+    persistence: supabaseConfigured ? 'supabase' : 'local-json',
+    database,
     payments: 'cashier-only',
     endpoints: [
       'GET /categories',
