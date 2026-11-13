@@ -3,9 +3,9 @@ const api = window.Pastifico;
 
 const COLUMNS = ['Recebido', 'Preparando', 'Pronto'];
 const NEXT = {
-  Recebido: { status: 'Preparando', label: 'Iniciar preparo' },
-  Preparando: { status: 'Pronto', label: 'Marcar como pronto' },
-  Pronto: { status: 'Entregue', label: 'Entregar' }
+  Recebido: { status: 'Preparando', label: 'Iniciar preparo', variant: 'button-primary' },
+  Preparando: { status: 'Pronto', label: 'Marcar como pronto', variant: 'button-success' },
+  Pronto: { status: 'Entregue', label: 'Entregar', variant: 'button-light' }
 };
 
 const els = {
@@ -67,7 +67,7 @@ function card(order, isNew) {
       </ul>
       <footer class="ticket-footer">
         <span class="ticket-pay">${escapeHtml(order.paymentMethod)} · ${formatCurrency(order.total)}</span>
-        ${next ? `<button class="button ticket-action" type="button" data-id="${escapeHtml(order.id)}" data-next="${next.status}">${next.label}</button>` : ''}
+        ${next ? `<button class="button ${next.variant} ticket-action" type="button" data-id="${escapeHtml(order.id)}" data-next="${next.status}">${next.label}</button>` : ''}
       </footer>
     </article>`;
 }
