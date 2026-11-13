@@ -3,9 +3,17 @@ import { Category } from '../models/Category';
 import { isSupabaseConfigured, requireSupabaseClient } from '../config/supabaseClient';
 import { ensureDatabaseFile, saveDatabase } from '../config/localDatabase';
 import { isValidUuid } from '../utils/uuid';
+import { escapeLikePattern } from '../utils/text';
 import { HttpError } from '../middlewares/errorHandler';
 
-const mapCategory = (row: any): Category => ({
+interface CategoryRow {
+  id: string;
+  name: string;
+  description: string;
+  created_at: string;
+}
+
+const mapCategory = (row: CategoryRow): Category => ({
   id: row.id,
   name: row.name,
   description: row.description,
@@ -44,9 +52,9 @@ export const categoryRepository = {
 
     if (isSupabaseConfigured()) {
       const supabase = requireSupabaseClient();
-      const { data: existing, error: existingError } = await supabase.from('categories').select('*').ilike('name', trimmedName).maybeSingle();
+      const { data: existing, error: existingError } = await supabase.from('categories').select('id').ilike('name', escapeLikePattern(trimmedName)).limit(1);
       if (existingError) throw existingError;
-      if (existing) return mapCategory(existing);
+      if (existing && existing.length > 0) throw new HttpError(409, 'Já existe uma categoria com esse nome.');
 
       const { data, error } = await supabase.from('categories').insert({ id: randomUUID(), name: trimmedName, description }).select().single();
       if (error) throw error;
@@ -55,7 +63,7 @@ export const categoryRepository = {
 
     const categories = findAllLocal();
     const existingCategory = categories.find((category) => category.name.toLowerCase() === trimmedName.toLowerCase());
-    if (existingCategory) return existingCategory;
+    if (existingCategory) throw new HttpError(409, 'Já existe uma categoria com esse nome.');
 
     const category: Category = {
       id: randomUUID(),
@@ -81,6 +89,12 @@ export const categoryRepository = {
     const category = categories.find((current) => current.id === id);
     if (!category) return undefined;
 
+    if (changes.name !== undefined) {
+      const newName = changes.name.toLowerCase();
+      const duplicate = categories.some((current) => current.id !== id && current.name.toLowerCase() === newName);
+      if (duplicate) throw new HttpError(409, 'Já existe uma categoria com esse nome.');
+    }
+
     Object.assign(category, changes);
     persistLocal(categories);
     return category;
@@ -89,19 +103,23 @@ export const categoryRepository = {
   async remove(id: string): Promise<boolean> {
     if (isSupabaseConfigured()) {
       if (!isValidUuid(id)) return false;
-      const { error, count } = await requireSupabaseClient().from('categories').delete({ count: 'exact' }).eq('id', id);
-      if (error?.code === '23503') {
-        throw new HttpError(409, 'Não é possível remover a categoria porque ela ainda possui produtos.');
-      }
+      const supabase = requireSupabaseClient();
+      const { count: productCount, error: productError } = await supabase.from('products').select('id', { count: 'exact', head: true }).eq('category_id', id);
+      if (productError) throw productError;
+      if (productCount) throw new HttpError(409, 'Não é possível remover: existem produtos vinculados a esta categoria.');
+
+      const { error, count } = await supabase.from('categories').delete({ count: 'exact' }).eq('id', id);
       if (error) throw error;
       return Boolean(count);
     }
 
-    const categories = findAllLocal();
+    const db = ensureDatabaseFile();
+    const categories = db.categories;
     const index = categories.findIndex((category) => category.id === id);
     if (index === -1) return false;
-    if (ensureDatabaseFile().products.some((product) => product.categoryId === id)) {
-      throw new HttpError(409, 'Não é possível remover a categoria porque ela ainda possui produtos.');
+
+    if (db.products.some((product) => product.categoryId === id)) {
+      throw new HttpError(409, 'Não é possível remover: existem produtos vinculados a esta categoria.');
     }
 
     categories.splice(index, 1);

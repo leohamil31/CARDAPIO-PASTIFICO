@@ -7,11 +7,13 @@ import orderRoutes from './routes/orderRoutes';
 import kitchenRoutes from './routes/kitchenRoutes';
 import { isSupabaseConfigured, requireSupabaseClient } from './config/supabaseClient';
 import { notFoundHandler, errorHandler } from './middlewares/errorHandler';
+import { openApiSpec } from './docs/openapi';
 
 const app = express();
 const publicDir = path.join(process.cwd(), 'public');
 
-app.use(express.json());
+app.disable('x-powered-by');
+app.use(express.json({ limit: '100kb' }));
 app.use(express.static(publicDir));
 
 app.get('/api/health', async (_req, res) => {
@@ -56,9 +58,34 @@ app.get('/api/health', async (_req, res) => {
       'PATCH /orders/:id/status',
       'DELETE /orders/:id',
       'GET /orders/kitchen',
-      'GET /orders/table/:tableNumber'
+      'GET /orders/table/:tableNumber',
+      'GET /api-docs'
     ]
   });
+});
+
+// Documentação interativa (Swagger UI carregado via CDN, sem dependências extras no back-end).
+app.get('/api-docs/openapi.json', (_req, res) => {
+  res.status(200).json(openApiSpec);
+});
+
+app.get('/api-docs', (_req, res) => {
+  res.status(200).type('html').send(`<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pastifico API - Documentação</title>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css" />
+</head>
+<body>
+  <div id="swagger-ui"></div>
+  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js" crossorigin></script>
+  <script>
+    window.ui = SwaggerUIBundle({ url: '/api-docs/openapi.json', dom_id: '#swagger-ui' });
+  </script>
+</body>
+</html>`);
 });
 
 app.get('/', (_req, res) => {

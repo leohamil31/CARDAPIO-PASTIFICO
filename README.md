@@ -1,6 +1,28 @@
 # Pastifico API
 
+> **Autor:** Leonardo Hamilton Moreira de Camargo — projeto acadêmico da disciplina de Desenvolvimento Back-End (2026).
+
 Sistema de autoatendimento para um restaurante italiano (Pastifico), com catálogo de produtos, carrinho de pedidos, painel de cozinha e acompanhamento de status do pedido.
+
+## Demonstração online (GitHub Pages)
+
+- **Cardápio:** https://leohamil31.github.io/cardapio-pastifico/
+- **Painel da cozinha (tempo real):** https://leohamil31.github.io/cardapio-pastifico/kitchen.html
+- **Acompanhar pedido:** https://leohamil31.github.io/cardapio-pastifico/order-status.html
+- **Histórico:** https://leohamil31.github.io/cardapio-pastifico/order-history.html
+
+> Os links consideram o repositório renomeado para `cardapio-pastifico`. Enquanto o nome for `projeto-back-end-2026`, troque esse trecho da URL.
+
+O GitHub Pages hospeda apenas arquivos estáticos, então a versão online não executa o servidor Node.js. A pasta `public/` detecta isso sozinha (`public/api.js`) e conversa **direto com o Supabase** usando a chave publicável (`public/config.js`). A segurança fica no banco ([`supabase/public-access.sql`](./supabase/public-access.sql)):
+
+- RLS permite apenas **leitura** do cardápio e dos pedidos; não existe escrita direta nas tabelas;
+- pedidos são criados pela função `create_order`, que **recalcula os preços no servidor** com as mesmas regras do back-end (vinhos, refrigerantes, adicionais);
+- o status do pedido só muda pela função `update_order_status`, que exige o **PIN da cozinha** (guardado com hash em um schema privado). Para trocar o PIN, rode no SQL Editor: `select private.set_kitchen_pin('NOVO-PIN');`
+- o painel da cozinha e a tela "Meu pedido" usam o **Supabase Realtime**: um pedido novo aparece na cozinha na hora, com aviso visual e sonoro opcional.
+
+Rodando localmente com `npm run dev`, o mesmo front-end usa a API REST do Express. Para forçar uma fonte, adicione `?fonte=api` ou `?fonte=supabase` à URL.
+
+O deploy é feito pelo workflow [`.github/workflows/pages.yml`](./.github/workflows/pages.yml) a cada push na `main`. Na primeira vez, ative em **Settings → Pages → Source: GitHub Actions**.
 
 ## 1. Descrição do projeto
 
@@ -11,7 +33,7 @@ A Pastifico API resolve o problema de pedidos presenciais em um restaurante de m
 
 ## 2. Integrantes da equipe
 
-- Leonardo Hamilton Moreira de Camargo
+- **Leonardo Hamilton Moreira de Camargo** (autor)
 - Gabriel Henrique Brito Nery
 - Ana Gabriela Rodrigues Harps
 
@@ -24,7 +46,8 @@ A Pastifico API resolve o problema de pedidos presenciais em um restaurante de m
 - PostgreSQL (via Supabase)
 - dotenv (variáveis de ambiente)
 - tsx (execução/watch em desenvolvimento)
-- Supertest + Node Test Runner (`node:test`) para testes automatizados
+- Supertest + Node Test Runner (`node:test`) para testes automatizados, com cobertura nativa do Node.js
+- OpenAPI 3 + Swagger UI (documentação interativa em `/api-docs`)
 - Git / GitHub (versionamento)
 
 ## 4. Entidades e relacionamento
@@ -91,18 +114,19 @@ O projeto possui 4 entidades, formando dois pares relacionados por chave estrang
 src/
 ├── config/          # Conexão com Supabase e persistência local (fallback em JSON)
 ├── controllers/     # Recebem a requisição HTTP, validam entrada e chamam os repositories
+├── docs/            # Especificação OpenAPI (Swagger) da API
 ├── middlewares/      # asyncHandler (captura de erros assíncronos) e errorHandler central
 ├── models/            # Interfaces/tipos das entidades (Category, Product, Order)
 ├── repositories/       # Acesso a dados (Supabase ou JSON local) para cada entidade
 ├── routes/              # Definição das rotas Express de cada recurso
-├── utils/                 # Funções utilitárias (ex.: normalização de parâmetros de rota)
+├── utils/                 # Validação de entrada, UUID e utilitários
 ├── app.ts                  # Configuração do Express (middlewares, rotas, tratamento de erro)
 └── server.ts                 # Ponto de entrada; inicia o servidor HTTP
 
-tests/        # Testes automatizados (node:test + supertest)
+tests/        # Testes automatizados por recurso (categorias, produtos, pedidos, sistema)
 scripts/      # Script de migração do JSON local para o Supabase
 supabase/     # Scripts SQL (schema e reset) para criar/recriar as tabelas
-public/       # Front-end estático (cliente, painel da cozinha, status do pedido)
+public/       # Front-end estático (cardápio, cozinha, status, histórico) — também publicado no GitHub Pages
 data/         # Banco de dados local em JSON (fallback quando o Supabase não está configurado)
 ```
 
@@ -110,7 +134,7 @@ data/         # Banco de dados local em JSON (fallback quando o Supabase não es
 
 ### Pré-requisitos
 
-- Node.js 20 LTS ou mais recente
+- Node.js 22.8 ou mais recente (necessário para o relatório de cobertura nativo)
 - Uma conta/projeto no [Supabase](https://supabase.com) (opcional — sem ele, o projeto roda com um arquivo JSON local)
 
 ### Passo a passo
@@ -118,8 +142,8 @@ data/         # Banco de dados local em JSON (fallback quando o Supabase não es
 1. Clone o repositório:
 
    ```powershell
-   git clone https://github.com/leohamil31/projeto-back-end-2026.git
-   cd projeto-back-end-2026
+   git clone https://github.com/leohamil31/cardapio-pastifico.git
+   cd cardapio-pastifico
    ```
 
 2. Instale as dependências:
@@ -143,15 +167,19 @@ data/         # Banco de dados local em JSON (fallback quando o Supabase não es
 5. Acesse no navegador:
    - Cliente: `http://localhost:3000/`
    - Painel da cozinha: `http://localhost:3000/kitchen-dashboard`
+   - Histórico: `http://localhost:3000/order-history`
    - Status do pedido: `http://localhost:3000/order-status`
    - Health check: `http://localhost:3000/api/health`
+   - Documentação Swagger: `http://localhost:3000/api-docs`
 
 ### Outros comandos
 
 ```powershell
 npm run build    # Compila o TypeScript para dist/
 npm start        # Executa a versão compilada (dist/server.js)
-npm test         # Executa os testes automatizados (usa sempre o armazenamento local)
+npm test         # Executa os testes automatizados (usa sempre um banco local temporário)
+npm run test:coverage  # Testes + relatório de cobertura (falha se a cobertura de linhas ficar abaixo de 60%)
+npm run typecheck      # Verifica os tipos do código e dos testes sem gerar build
 ```
 
 ## 7. Variáveis de ambiente
@@ -164,7 +192,7 @@ SUPABASE_SERVICE_ROLE_KEY=
 ```
 
 - Se **ambas** estiverem vazias, a API usa automaticamente o arquivo local `data/pastifico-db.json` para persistir os dados.
-- Se **ambas** estiverem preenchidas com as credenciais do seu projeto Supabase, a API passa a usar o Supabase/PostgreSQL. O health check consulta `categories` e retorna `database: "connected"` se conseguir acessar as tabelas; falhas de conexão ou schema retornam HTTP 503 e `database: "unavailable"`.
+- Se **ambas** estiverem preenchidas com as credenciais do seu projeto Supabase, a API passa a usar o Supabase/PostgreSQL. O health check consulta `categories` e retorna `database: "connected"`; falhas de conexão ou de schema retornam HTTP 503 e `database: "unavailable"`.
 - Se apenas uma das duas variáveis estiver preenchida, a API retorna erro de configuração em vez de trocar silenciosamente para o banco local.
 
 **Importante:** o arquivo `.env` com as credenciais reais nunca é enviado ao Git (está listado no `.gitignore`). Apenas o `.env.example`, com os nomes das variáveis vazios, é versionado.
@@ -180,17 +208,17 @@ O banco utiliza 4 tabelas no PostgreSQL (Supabase), criadas pelo script [`supaba
 
 Todas as chaves primárias usam `uuid` (gerado com `gen_random_uuid()`), e as relações entre `products → categories`, `order_items → orders` e `order_items → products` são implementadas com chaves estrangeiras (Foreign Key).
 
-As chaves estrangeiras impedem remover categorias que ainda possuem produtos ou produtos já referenciados no histórico de pedidos. Nesses casos, a API responde `409 Conflict`; os itens de pedido são removidos em cascata quando um pedido é excluído.
-
 Para reproduzir a estrutura em um projeto Supabase novo:
 
 1. Abra o **SQL Editor** do seu projeto Supabase.
-2. Execute o conteúdo de [`supabase/schema.sql`](./supabase/schema.sql).
+2. Execute o conteúdo de [`supabase/schema.sql`](./supabase/schema.sql) e depois [`supabase/public-access.sql`](./supabase/public-access.sql) (necessário para a versão do GitHub Pages).
 3. (Opcional) Para carregar o catálogo inicial de exemplo (4 categorias e 27 produtos) a partir do `data/pastifico-db.json`, rode:
 
    ```powershell
    npm run migrate:supabase
    ```
+
+   O script é idempotente: sincroniza categorias e produtos pelo **nome** (traduzindo os ids locais para os ids do Supabase), então pode ser executado mais de uma vez sem erro de duplicidade.
 
 Caso precise recomeçar do zero em um projeto Supabase já existente, use [`supabase/reset-schema.sql`](./supabase/reset-schema.sql) antes do `schema.sql` (⚠️ isso apaga todos os dados atuais das tabelas).
 
@@ -232,7 +260,22 @@ Caso precise recomeçar do zero em um projeto Supabase já existente, use [`supa
 
 | Método | Endpoint | Descrição |
 |---|---|---|
-| GET | `/api/health` | Retorna status da API, persistência (`supabase` ou `local-json`) e conectividade com o banco |
+| GET | `/api/health` | Retorna status da API e o tipo de persistência ativa (`supabase` ou `local-json`) |
+| GET | `/api-docs` | Documentação interativa (Swagger UI) |
+| GET | `/api-docs/openapi.json` | Especificação OpenAPI 3 (pode ser importada no Postman) |
+
+### Códigos de resposta e erros
+
+Todos os erros retornam JSON no formato `{ "message": "..." }`.
+
+| Código | Quando acontece |
+|---|---|
+| 200 / 201 / 204 | Sucesso (consulta/atualização, criação, remoção) |
+| 400 | JSON malformado, campo obrigatório ausente, tipo inválido, `:id` que não é UUID, adicional incompatível com o produto |
+| 404 | Registro não encontrado ou rota inexistente |
+| 409 | Nome de categoria/produto duplicado; remoção de categoria com produtos; remoção de produto que já aparece em pedidos |
+| 413 | Corpo da requisição maior que 100 KB |
+| 500 | Erro inesperado (detalhes só no log do servidor) |
 
 ## 10. Exemplos de requisições
 
@@ -295,16 +338,13 @@ Caso precise recomeçar do zero em um projeto Supabase já existente, use [`supa
 ## Testes
 
 ```powershell
-npm run build
 npm test
 npm run test:coverage
 ```
 
-Os testes automatizados usam sempre o armazenamento local (`data/pastifico-db.json`) e não se conectam ao Supabase, mesmo que o `.env` esteja configurado. O comando `test:coverage` gera o relatório nativo de cobertura do Node.js e falha caso a cobertura de linhas fique abaixo de 60%.
-
-## Documentação da API
-
-A especificação dos endpoints e exemplos de payloads estão neste README. A coleção e o ambiente Postman em `postman/` permitem executar as requisições e são mantidos junto ao código. Este projeto não inclui Swagger/OpenAPI interativo; adicione-o somente se a rubrica da disciplina exigir explicitamente uma documentação OpenAPI servida pela aplicação.
+- 75 testes em `tests/` cobrindo todas as rotas de Categorias, Produtos e Pedidos (casos de sucesso, 400, 404 e 409), regras de preço dos adicionais, painel da cozinha, documentação e o middleware de erros.
+- Cada arquivo de teste usa um banco JSON temporário próprio (variável `PASTIFICO_DB_PATH`), então `data/pastifico-db.json` não é alterado e o Supabase nunca é acessado, mesmo com o `.env` preenchido.
+- `npm run test:coverage` usa a cobertura nativa do Node.js (`--experimental-test-coverage`) apenas sobre `src/` e encerra com erro se a cobertura de linhas ficar abaixo de **60%**. Cobertura atual: ~89% das linhas (os trechos não cobertos são os ramos específicos do Supabase).
 
 ## Testar no Postman
 
@@ -315,9 +355,10 @@ A especificação dos endpoints e exemplos de payloads estão neste README. A co
 3. Selecione o ambiente **Pastifico Local**.
 4. Teste primeiro `Sistema → Health check`; a resposta esperada é `200 OK`.
 5. Rode `Categorias → Listar categorias` e `Produtos → Listar produtos` para capturar automaticamente os ids (uuid) reais nas variáveis `categoryId` e `productId` da coleção.
-6. A partir daí, as demais requisições (criar, atualizar, remover produto/categoria/pedido) já funcionam usando esses ids capturados automaticamente pelos scripts de teste de cada requisição.
+6. A partir daí, as demais requisições já funcionam usando os ids capturados automaticamente.
+7. Para validar tudo de uma vez, use **Run collection** (Collection Runner): as 28 requisições têm testes `pm.test` e devem passar na ordem das pastas.
 
-Os scripts salvam os ids tanto na coleção quanto no ambiente ativo, evitando que os valores vazios do ambiente sobrescrevam os ids recém-capturados.
+A coleção nunca altera ou remove itens reais do cardápio: o que ela cria fica em `createdCategoryId`/`createdProductId` (com nome único via `{{$timestamp}}`) e é removido ao final. Os ids ficam só nas variáveis da coleção — o ambiente **Pastifico Local** contém apenas `baseUrl` e `tableNumber`, porque variáveis de ambiente têm prioridade sobre as da coleção no Postman.
 
 ## Observação sobre pagamentos
 

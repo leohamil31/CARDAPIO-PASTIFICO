@@ -1,515 +1,463 @@
+const { escapeHtml, formatCurrency, toast, storage } = window.Pastifico;
+
 const state = {
   categories: [],
   products: [],
   selectedCategory: 'all',
+  search: '',
   cart: [],
-  paymentMethod: 'Cartão',
-  customizingProduct: null,
-  customizingQuantity: 1
+  customizing: null,
+  quantity: 1
 };
 
-const categoryList = document.querySelector('#categories');
-const productList = document.querySelector('#products');
-const cartItems = document.querySelector('#cart-items');
-const subtotalEl = document.querySelector('#subtotal');
-const totalEl = document.querySelector('#total');
-const orderForm = document.querySelector('#order-form');
-const checkoutModal = document.querySelector('#checkout-modal');
-const checkoutSummary = document.querySelector('#checkout-summary');
-const closeCheckout = document.querySelector('#close-checkout');
-const cancelCheckout = document.querySelector('#cancel-checkout');
-const confirmCheckout = document.querySelector('#confirm-checkout');
-const paymentOptions = document.querySelectorAll('.payment-option');
-const customerNameInput = document.querySelector('#customerName');
-const tableNumberInput = document.querySelector('#tableNumber');
-const customizeModal = document.querySelector('#customize-modal');
-const customizeImage = document.querySelector('#customize-image');
-const customizeTitle = document.querySelector('#customize-title');
-const customizeDescription = document.querySelector('#customize-description');
-const customizePrice = document.querySelector('#customize-price');
-const customizeOptions = document.querySelector('#customize-options');
-const customizeQuantity = document.querySelector('#customize-quantity');
-const closeCustomize = document.querySelector('#close-customize');
-const addCustomized = document.querySelector('#add-customized');
-const customizeDecrease = document.querySelector('#customize-decrease');
-const customizeIncrease = document.querySelector('#customize-increase');
+const $ = (selector) => document.querySelector(selector);
+const els = {
+  categories: $('#categories'),
+  products: $('#products'),
+  search: $('#search'),
+  cart: $('#cart'),
+  cartItems: $('#cart-items'),
+  cartCount: $('#cart-count'),
+  total: $('#total'),
+  form: $('#order-form'),
+  name: $('#customerName'),
+  table: $('#tableNumber'),
+  fab: $('#cart-fab'),
+  fabCount: $('#cart-fab-count'),
+  fabTotal: $('#cart-fab-total'),
+  backdrop: $('#cart-backdrop'),
+  cartClose: $('#cart-close'),
+  customizeModal: $('#customize-modal'),
+  customizeImage: $('#customize-image'),
+  customizeTitle: $('#customize-title'),
+  customizeDescription: $('#customize-description'),
+  customizeOptions: $('#customize-options'),
+  customizeQuantity: $('#customize-quantity'),
+  customizeTotal: $('#customize-total'),
+  checkoutModal: $('#checkout-modal'),
+  checkoutSummary: $('#checkout-summary'),
+  confirmCheckout: $('#confirm-checkout'),
+  dataSource: $('#data-source')
+};
 
-const foodCustomizationOptions = [
+// ---------- regras de personalização (o preço final é sempre recalculado no servidor) ----------
+const FOOD_OPTIONS = [
   { id: 'molho-extra', name: 'Molho extra da casa', price: 4 },
   { id: 'parmesao', name: 'Parmesão ralado na hora', price: 3 },
   { id: 'bacon', name: 'Bacon crocante', price: 5 },
   { id: 'frango', name: 'Frango grelhado', price: 8 },
   { id: 'pimenta', name: 'Pimenta calabresa', price: 2 }
 ];
-
-const dessertCustomizationOptions = [
+const DESSERT_OPTIONS = [
   { id: 'calda-chocolate', name: 'Calda de chocolate extra', price: 3 },
   { id: 'chantilly', name: 'Chantilly', price: 3 },
   { id: 'amendoas', name: 'Raspas de amêndoas', price: 4 }
 ];
+const WINES = ['Vinho Toscano', 'Chianti Classico', 'Pinot Grigio delle Venezie', 'Prosecco Veneto', 'Montepulciano d’Abruzzo'];
+const SODAS = ['Coca-Cola 600ml', 'Guaraná Antarctica 600ml', 'Fanta Laranja 600ml'];
+const CATEGORY_ICONS = { Massas: '🍝', Entradas: '🥖', Bebidas: '🍷', Sobremesas: '🍮' };
 
-const WINE_PRODUCT_NAMES = ['Vinho Toscano', 'Chianti Classico', 'Pinot Grigio delle Venezie', 'Prosecco Veneto', 'Montepulciano d’Abruzzo'];
-const SODA_PRODUCT_NAMES = ['Coca-Cola 600ml', 'Guaraná Antarctica 600ml', 'Fanta Laranja 600ml'];
-
-const getCustomizationOptions = (product) => {
-  if (WINE_PRODUCT_NAMES.includes(product.name)) {
+function getOptions(product) {
+  if (WINES.includes(product.name)) {
     return [
-      { id: 'taca-vinho', name: 'Taça de vinho', price: 0, replacePrice: 18, inputType: 'radio', group: 'wine-format' },
-      { id: 'garrafa-vinho', name: 'Garrafa de vinho', price: 0, replacePrice: product.price, inputType: 'radio', group: 'wine-format' }
+      { id: 'garrafa-vinho', name: 'Garrafa de vinho', price: 0, replacePrice: product.price, type: 'radio', group: 'formato', default: true },
+      { id: 'taca-vinho', name: 'Taça de vinho', price: 0, replacePrice: 18, type: 'radio', group: 'formato' }
     ];
   }
-
-  if (SODA_PRODUCT_NAMES.includes(product.name)) {
+  if (SODAS.includes(product.name)) {
     return [
-      { id: 'lata', name: 'Lata 350 ml', price: 0, replacePrice: 7.5, inputType: 'radio', group: 'soda-format' },
-      { id: 'garrafa-600ml', name: 'Garrafa 600 ml', price: 0, replacePrice: product.price, inputType: 'radio', group: 'soda-format' },
+      { id: 'garrafa-600ml', name: 'Garrafa 600 ml', price: 0, replacePrice: product.price, type: 'radio', group: 'formato', default: true },
+      { id: 'lata', name: 'Lata 350 ml', price: 0, replacePrice: 7.5, type: 'radio', group: 'formato' },
       { id: 'copo-gelo', name: 'Copo com gelo', price: 1.5 },
       { id: 'limao', name: 'Com limão', price: 1 },
       { id: 'laranja', name: 'Com laranja', price: 1 }
     ];
   }
-
   const category = state.categories.find((item) => item.id === product.categoryId);
   if (category?.name === 'Bebidas') return [];
-  if (category?.name === 'Sobremesas') return dessertCustomizationOptions;
-  return foodCustomizationOptions;
-};
-
-function formatCurrency(value) {
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL'
-  }).format(value);
+  if (category?.name === 'Sobremesas') return DESSERT_OPTIONS;
+  return FOOD_OPTIONS;
 }
 
-function getSelectedProducts() {
-  if (state.selectedCategory === 'all') {
-    return state.products;
-  }
+function priceWith(product, options) {
+  const replacement = options.find((option) => Number.isFinite(option.replacePrice));
+  const extras = options.reduce((sum, option) => sum + option.price, 0);
+  return Math.round(((replacement ? replacement.replacePrice : product.price) + extras) * 100) / 100;
+}
 
-  return state.products.filter((product) => product.categoryId === state.selectedCategory);
+// ---------- catálogo ----------
+function filteredProducts() {
+  const term = state.search.trim().toLowerCase();
+  return state.products.filter((product) => {
+    if (state.selectedCategory !== 'all' && product.categoryId !== state.selectedCategory) return false;
+    if (!term) return true;
+    return `${product.name} ${product.description}`.toLowerCase().includes(term);
+  });
 }
 
 function renderCategories() {
-  const categories = [{ id: 'all', name: 'Todos' }, ...state.categories];
+  const all = [{ id: 'all', name: 'Todos' }, ...state.categories];
+  els.categories.innerHTML = all.map((category) => {
+    const count = category.id === 'all' ? state.products.length : state.products.filter((p) => p.categoryId === category.id).length;
+    const active = state.selectedCategory === category.id;
+    return `
+      <button class="chip ${active ? 'active' : ''}" role="tab" aria-selected="${active}" data-category="${escapeHtml(category.id)}" type="button">
+        ${CATEGORY_ICONS[category.name] ? `<span aria-hidden="true">${CATEGORY_ICONS[category.name]}</span>` : ''}
+        ${escapeHtml(category.name)}
+        <small>${count}</small>
+      </button>`;
+  }).join('');
+}
 
-  categoryList.innerHTML = categories
-    .map(
-      (category) => `
-        <button
-          class="category-button ${state.selectedCategory === category.id ? 'active' : ''}"
-          data-category="${category.id}"
-          type="button"
-        >
-          ${category.name}
-        </button>
-      `
-    )
-    .join('');
-
-  categoryList.querySelectorAll('.category-button').forEach((button) => {
-    button.addEventListener('click', () => {
-      state.selectedCategory = button.dataset.category;
-      renderCategories();
-      renderProducts();
-    });
-  });
+function productCard(product, index) {
+  const unavailable = !product.isAvailable;
+  return `
+    <article class="product-card reveal ${unavailable ? 'is-unavailable' : ''}" style="--i:${index % 9}" data-product-id="${escapeHtml(product.id)}"
+      tabindex="${unavailable ? -1 : 0}" role="button" aria-label="${escapeHtml(product.name)}, ${formatCurrency(product.price)}${unavailable ? ', indisponível' : ''}">
+      <div class="product-media">
+        <img src="${escapeHtml(product.image)}" alt="" loading="lazy" decoding="async" />
+        ${unavailable ? '<span class="badge badge-muted">Indisponível</span>' : ''}
+      </div>
+      <div class="product-body">
+        <h3>${escapeHtml(product.name)}</h3>
+        <p>${escapeHtml(product.description)}</p>
+        <div class="product-footer">
+          <strong class="price">${formatCurrency(product.price)}</strong>
+          <span class="add-button" aria-hidden="true">${unavailable ? '—' : '+'}</span>
+        </div>
+      </div>
+    </article>`;
 }
 
 function renderProducts() {
-  const products = getSelectedProducts();
+  const products = filteredProducts();
 
-  if (products.length === 0) {
-    productList.innerHTML = '<p class="cart-empty">Nenhum produto disponível nesta categoria.</p>';
+  if (!products.length) {
+    els.products.innerHTML = `<div class="empty-state"><span aria-hidden="true">🔎</span><p>Nenhum item encontrado${state.search ? ` para “${escapeHtml(state.search)}”` : ''}.</p></div>`;
     return;
   }
 
-  productList.innerHTML = products
-    .map(
-      (product) => `
-        <article class="product-card" data-product-id="${product.id}" tabindex="0">
-          <div class="product-image">
-            <img src="${product.image}" alt="${product.name}" data-category="${product.categoryId}" />
-          </div>
-          <div class="product-content">
-            <div class="product-name">
-              <h3>${product.name}</h3>
-              <span class="product-price">${formatCurrency(product.price)}</span>
-            </div>
-            <p class="product-description">${product.description}</p>
-            <div class="product-meta">
-              <span class="product-badge ${product.isAvailable ? '' : 'out'}">
-                ${product.isAvailable ? 'Disponível' : 'Indisponível'}
-              </span>
-              <button class="add-button" data-product-id="${product.id}" ${product.isAvailable ? '' : 'disabled'}>
-                Personalizar
-              </button>
-            </div>
-          </div>
-        </article>
-      `
-    )
-    .join('');
-
-  productList.querySelectorAll('.product-image img').forEach((image) => {
-    image.addEventListener('error', () => {
-      image.classList.add('image-broken');
-      image.parentElement.classList.add('image-missing');
-      image.parentElement.dataset.label = image.alt;
-    }, { once: true });
-  });
-
-  productList.querySelectorAll('.add-button').forEach((button) => {
-    button.addEventListener('click', (event) => {
-      const target = event.currentTarget;
-      const product = state.products.find((item) => item.id === target.dataset.productId);
-
-      if (!product) {
-        return;
-      }
-
-      openCustomizeModal(product);
-    });
-  });
-
-  productList.querySelectorAll('.product-card').forEach((card) => {
-    card.addEventListener('click', (event) => {
-      if (event.target.closest('button')) return;
-      const product = state.products.find((item) => item.id === card.dataset.productId);
-      if (product?.isAvailable) openCustomizeModal(product);
-    });
-    card.addEventListener('keydown', (event) => {
-      if (event.key !== 'Enter' && event.key !== ' ') return;
-      event.preventDefault();
-      const product = state.products.find((item) => item.id === card.dataset.productId);
-      if (product?.isAvailable) openCustomizeModal(product);
-    });
-  });
-}
-
-function addToCart(product, selectedOptions = [], quantity = 1) {
-  const replacement = selectedOptions.find((option) => Number.isFinite(option.replacePrice));
-  const optionPrice = selectedOptions.reduce((sum, option) => sum + option.price, 0);
-  const configuredPrice = replacement ? replacement.replacePrice + optionPrice : product.price + optionPrice;
-  const itemId = `${product.id}-${selectedOptions.map((option) => option.id).sort().join('-') || 'original'}`;
-  const optionNames = selectedOptions.map((option) => option.name);
-  const existingItem = state.cart.find((item) => item.id === itemId);
-
-  if (existingItem) {
-    existingItem.quantity += quantity;
+  if (state.selectedCategory === 'all' && !state.search) {
+    els.products.innerHTML = state.categories.map((category) => {
+      const items = products.filter((product) => product.categoryId === category.id);
+      if (!items.length) return '';
+      return `
+        <section class="menu-section" aria-labelledby="cat-${escapeHtml(category.id)}">
+          <header class="menu-section-header">
+            <h3 id="cat-${escapeHtml(category.id)}">${escapeHtml(category.name)}</h3>
+            <p>${escapeHtml(category.description || '')}</p>
+          </header>
+          <div class="product-grid">${items.map(productCard).join('')}</div>
+        </section>`;
+    }).join('');
   } else {
-    state.cart.push({
-      id: itemId,
-      productId: product.id,
-      name: product.name,
-      price: configuredPrice,
-      quantity,
-      options: optionNames
-    });
+    els.products.innerHTML = `<div class="product-grid">${products.map(productCard).join('')}</div>`;
   }
 
-  renderCart();
+  els.products.querySelectorAll('img').forEach((image) => {
+    image.addEventListener('error', () => image.closest('.product-media')?.classList.add('no-image'), { once: true });
+  });
+  observeReveal();
 }
 
-function openCustomizeModal(product) {
-  state.customizingProduct = product;
-  state.customizingQuantity = 1;
-  customizeImage.src = product.image;
-  customizeImage.alt = product.name;
-  customizeImage.dataset.category = product.categoryId;
-  customizeTitle.textContent = product.name;
-  customizeDescription.textContent = product.description;
-  const options = getCustomizationOptions(product);
-  customizePrice.textContent = formatCurrency(product.price);
-  customizeOptions.innerHTML = options.length ? options
-    .map((option) => `
-      <label class="customize-option">
-        <span><input type="${option.inputType || 'checkbox'}" name="${option.group || option.id}" value="${option.id}" ${['garrafa-vinho', 'garrafa-600ml'].includes(option.id) ? 'checked' : ''} /> ${option.name}</span>
-        <strong>${Number.isFinite(option.replacePrice) ? 'Selecionar' : `+ ${formatCurrency(option.price)}`}</strong>
-      </label>
-    `)
-    .join('') : '<p class="customize-empty">Este item já está pronto para servir.</p>';
-  customizeQuantity.textContent = '1';
-  customizeModal.classList.remove('hidden');
-  customizeModal.setAttribute('aria-hidden', 'false');
+const revealObserver = 'IntersectionObserver' in window
+  ? new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('in-view');
+        revealObserver.unobserve(entry.target);
+      }
+    });
+  }, { rootMargin: '0px 0px -40px 0px' })
+  : null;
+
+function observeReveal() {
+  document.querySelectorAll('.reveal:not(.in-view)').forEach((element) => {
+    if (revealObserver) revealObserver.observe(element);
+    else element.classList.add('in-view');
+  });
 }
 
-function closeCustomizeModal() {
-  customizeModal.classList.add('hidden');
-  customizeModal.setAttribute('aria-hidden', 'true');
-  state.customizingProduct = null;
-}
-
-function getSelectedCustomizations() {
-  return Array.from(customizeOptions.querySelectorAll('input:checked'))
-    .map((input) => {
-      const productOptions = getCustomizationOptions(state.customizingProduct);
-      return productOptions.find((option) => option.id === input.value);
-    })
+// ---------- personalização ----------
+function selectedOptions() {
+  if (!state.customizing) return [];
+  const options = getOptions(state.customizing);
+  return Array.from(els.customizeOptions.querySelectorAll('input:checked'))
+    .map((input) => options.find((option) => option.id === input.value))
     .filter(Boolean);
 }
 
-function updateCartItem(productId, delta) {
-  const item = state.cart.find((entry) => entry.id === productId);
+function updateCustomizeTotal() {
+  const unit = priceWith(state.customizing, selectedOptions());
+  els.customizeQuantity.textContent = String(state.quantity);
+  els.customizeTotal.textContent = formatCurrency(unit * state.quantity);
+}
 
-  if (!item) {
-    return;
+function openCustomize(product) {
+  if (!product?.isAvailable) return;
+  state.customizing = product;
+  state.quantity = 1;
+  els.customizeImage.src = product.image;
+  els.customizeImage.alt = product.name;
+  els.customizeTitle.textContent = product.name;
+  els.customizeDescription.textContent = product.description;
+
+  const options = getOptions(product);
+  els.customizeOptions.innerHTML = options.length
+    ? options.map((option) => `
+        <label class="option">
+          <input type="${option.type || 'checkbox'}" name="${option.group || option.id}" value="${option.id}" ${option.default ? 'checked' : ''} />
+          <span class="option-name">${escapeHtml(option.name)}</span>
+          <span class="option-price">${Number.isFinite(option.replacePrice) ? formatCurrency(option.replacePrice) : `+ ${formatCurrency(option.price)}`}</span>
+        </label>`).join('')
+    : '<p class="muted">Este item já vem pronto para servir. 🍽️</p>';
+
+  updateCustomizeTotal();
+  openModal(els.customizeModal);
+}
+
+// ---------- carrinho ----------
+function saveCart() {
+  storage.set('pastifico-cart', JSON.stringify(state.cart));
+}
+
+function addToCart(product, options, quantity) {
+  const key = `${product.id}:${options.map((option) => option.id).sort().join(',')}`;
+  const existing = state.cart.find((item) => item.key === key);
+  if (existing) existing.quantity = Math.min(99, existing.quantity + quantity);
+  else {
+    state.cart.push({
+      key,
+      productId: product.id,
+      name: product.name,
+      image: product.image,
+      price: priceWith(product, options),
+      quantity,
+      options: options.map((option) => option.name)
+    });
   }
+  saveCart();
+  renderCart();
+  bump(els.fab);
+  bump(els.cartCount);
+  toast(`${quantity}× ${product.name} adicionado ao pedido`, 'success');
+}
 
-  item.quantity += delta;
-
-  if (item.quantity <= 0) {
-    state.cart = state.cart.filter((entry) => entry.id !== productId);
-  }
-
+function changeQuantity(key, delta) {
+  const item = state.cart.find((entry) => entry.key === key);
+  if (!item) return;
+  item.quantity = Math.min(99, item.quantity + delta);
+  if (item.quantity <= 0) state.cart = state.cart.filter((entry) => entry.key !== key);
+  saveCart();
   renderCart();
 }
 
+const cartTotal = () => state.cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+const cartQuantity = () => state.cart.reduce((sum, item) => sum + item.quantity, 0);
+
 function renderCart() {
-  if (state.cart.length === 0) {
-    cartItems.innerHTML = '<div class="cart-empty">Seu carrinho está vazio. Escolha um prato para começar.</div>';
-    subtotalEl.textContent = formatCurrency(0);
-    totalEl.textContent = formatCurrency(0);
+  const quantity = cartQuantity();
+  const total = cartTotal();
+  els.cartCount.textContent = `${quantity} ${quantity === 1 ? 'item' : 'itens'}`;
+  els.total.textContent = formatCurrency(total);
+  els.fabCount.textContent = String(quantity);
+  els.fabTotal.textContent = formatCurrency(total);
+  els.fab.classList.toggle('visible', quantity > 0);
+
+  if (!state.cart.length) {
+    els.cartItems.innerHTML = '<div class="cart-empty"><span aria-hidden="true">🍝</span><p>Seu pedido está vazio.<br />Toque em um prato para começar.</p></div>';
     return;
   }
 
-  cartItems.innerHTML = state.cart
-    .map(
-      (item) => `
-        <div class="cart-item">
-          <div>
-            <h4>${item.name}</h4>
-            <small>${item.options?.length ? item.options.join(' · ') : 'Receita original'} · ${formatCurrency(item.price)} cada</small>
-          </div>
-          <div>
-            <button type="button" data-action="decrease" data-product-id="${item.id}">-</button>
-            <span>${item.quantity}</span>
-            <button type="button" data-action="increase" data-product-id="${item.id}">+</button>
-          </div>
-          <strong>${formatCurrency(item.price * item.quantity)}</strong>
-        </div>
-      `
-    )
-    .join('');
+  els.cartItems.innerHTML = state.cart.map((item) => `
+    <div class="cart-item">
+      <img src="${escapeHtml(item.image)}" alt="" loading="lazy" />
+      <div class="cart-item-info">
+        <strong>${escapeHtml(item.name)}</strong>
+        <small>${item.options.length ? escapeHtml(item.options.join(' · ')) : 'Receita original'}</small>
+        <span class="cart-item-price">${formatCurrency(item.price * item.quantity)}</span>
+      </div>
+      <div class="stepper stepper-small">
+        <button type="button" data-key="${escapeHtml(item.key)}" data-delta="-1" aria-label="Remover um ${escapeHtml(item.name)}">−</button>
+        <output>${item.quantity}</output>
+        <button type="button" data-key="${escapeHtml(item.key)}" data-delta="1" aria-label="Adicionar um ${escapeHtml(item.name)}">+</button>
+      </div>
+    </div>`).join('');
+}
 
-  cartItems.querySelectorAll('button[data-product-id]').forEach((button) => {
-    button.addEventListener('click', (event) => {
-      const current = event.currentTarget;
-      const productId = current.dataset.productId;
-      const action = current.dataset.action;
+function bump(element) {
+  element.classList.remove('bump');
+  void element.offsetWidth; // reinicia a animação
+  element.classList.add('bump');
+}
 
-      if (action === 'increase') {
-        updateCartItem(productId, 1);
-      }
+// ---------- modais e gaveta do carrinho ----------
+let lastFocus = null;
+function openModal(modal) {
+  lastFocus = document.activeElement;
+  modal.hidden = false;
+  requestAnimationFrame(() => modal.classList.add('open'));
+  document.body.classList.add('no-scroll');
+  modal.querySelector('.modal-close')?.focus();
+}
 
-      if (action === 'decrease') {
-        updateCartItem(productId, -1);
-      }
-    });
-  });
+function closeModal(modal) {
+  modal.classList.remove('open');
+  document.body.classList.remove('no-scroll');
+  setTimeout(() => { modal.hidden = true; }, 220);
+  lastFocus?.focus?.();
+}
 
-  const subtotal = state.cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  subtotalEl.textContent = formatCurrency(subtotal);
-  totalEl.textContent = formatCurrency(subtotal);
+function setCartOpen(open) {
+  document.body.classList.toggle('cart-open', open);
+  els.backdrop.hidden = !open;
+  els.fab.setAttribute('aria-expanded', String(open));
+  if (open) els.cartClose.focus();
+}
+
+// ---------- checkout ----------
+const paymentMethod = () => els.form.querySelector('input[name="paymentMethod"]:checked')?.value || 'Cartão';
+
+function validateForm() {
+  if (!state.cart.length) return 'Adicione pelo menos um item ao pedido.';
+  if (!els.name.value.trim()) { els.name.focus(); return 'Informe seu nome.'; }
+  const table = Number(els.table.value);
+  if (!Number.isInteger(table) || table < 1 || table > 999) { els.table.focus(); return 'Informe um número de mesa válido.'; }
+  return null;
 }
 
 function renderCheckoutSummary() {
-  const subtotal = state.cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const customerName = customerNameInput.value.trim();
-  const tableNumber = tableNumberInput.value.trim();
-
-  checkoutSummary.innerHTML = `
-    <div class="checkout-summary-row">
-      <span>Cliente</span>
-      <strong>${customerName || 'Não informado'}</strong>
-    </div>
-    <div class="checkout-summary-row">
-      <span>Mesa</span>
-      <strong>${tableNumber || '-'}</strong>
-    </div>
-    <div class="checkout-summary-row">
-      <span>Pagamento</span>
-      <strong>${state.paymentMethod}</strong>
-    </div>
-    <div class="checkout-summary-list">
-      ${state.cart
-        .map(
-          (item) => `
-            <div class="checkout-summary-item">
-              <span>${item.quantity}x ${item.name}</span>
-              <strong>${formatCurrency(item.price * item.quantity)}</strong>
-            </div>
-          `
-        )
-        .join('')}
-    </div>
-    <div class="checkout-summary-row">
-      <span>Total</span>
-      <strong>${formatCurrency(subtotal)}</strong>
-    </div>
-  `;
+  els.checkoutSummary.innerHTML = `
+    <dl class="summary-grid">
+      <div><dt>Cliente</dt><dd>${escapeHtml(els.name.value.trim())}</dd></div>
+      <div><dt>Mesa</dt><dd>${escapeHtml(els.table.value)}</dd></div>
+      <div><dt>Pagamento</dt><dd>${escapeHtml(paymentMethod())}</dd></div>
+    </dl>
+    <ul class="summary-items">
+      ${state.cart.map((item) => `
+        <li><span>${item.quantity}× ${escapeHtml(item.name)}${item.options.length ? `<small>${escapeHtml(item.options.join(', '))}</small>` : ''}</span>
+        <strong>${formatCurrency(item.price * item.quantity)}</strong></li>`).join('')}
+    </ul>
+    <div class="summary-total"><span>Total estimado</span><strong>${formatCurrency(cartTotal())}</strong></div>`;
 }
 
-function openCheckoutModal() {
-  renderCheckoutSummary();
-  checkoutModal.classList.remove('hidden');
-  checkoutModal.setAttribute('aria-hidden', 'false');
-}
+async function confirmOrder() {
+  const error = validateForm();
+  if (error) { closeModal(els.checkoutModal); toast(error, 'error'); return; }
 
-function closeCheckoutModal() {
-  checkoutModal.classList.add('hidden');
-  checkoutModal.setAttribute('aria-hidden', 'true');
-}
-
-function setPaymentMethod(method) {
-  state.paymentMethod = method;
-
-  paymentOptions.forEach((option) => {
-    const isActive = option.querySelector('input').value === method;
-    option.classList.toggle('active', isActive);
-    option.querySelector('input').checked = isActive;
-  });
-
-  if (!checkoutModal.classList.contains('hidden')) {
-    renderCheckoutSummary();
+  els.confirmCheckout.disabled = true;
+  els.confirmCheckout.classList.add('loading');
+  try {
+    const order = await window.Pastifico.createOrder({
+      customerName: els.name.value.trim(),
+      tableNumber: Number(els.table.value),
+      paymentMethod: paymentMethod(),
+      items: state.cart.map((item) => ({ productId: item.productId, quantity: item.quantity, options: item.options }))
+    });
+    state.cart = [];
+    saveCart();
+    storage.set('pastifico-last-order', order.id);
+    window.location.href = `order-status.html?orderId=${encodeURIComponent(order.id)}&novo=1`;
+  } catch (err) {
+    toast(err.message || 'Não foi possível enviar o pedido.', 'error');
+    els.confirmCheckout.disabled = false;
+    els.confirmCheckout.classList.remove('loading');
   }
 }
 
-async function loadCatalog() {
+// ---------- eventos ----------
+els.categories.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-category]');
+  if (!button) return;
+  state.selectedCategory = button.dataset.category;
+  renderCategories();
+  renderProducts();
+  button.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+});
+
+let searchTimer;
+els.search.addEventListener('input', () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => {
+    state.search = els.search.value;
+    renderProducts();
+  }, 150);
+});
+
+els.products.addEventListener('click', (event) => {
+  const card = event.target.closest('.product-card[data-product-id]');
+  if (card) openCustomize(state.products.find((product) => product.id === card.dataset.productId));
+});
+els.products.addEventListener('keydown', (event) => {
+  if (event.key !== 'Enter' && event.key !== ' ') return;
+  const card = event.target.closest('.product-card[data-product-id]');
+  if (!card) return;
+  event.preventDefault();
+  openCustomize(state.products.find((product) => product.id === card.dataset.productId));
+});
+
+els.customizeOptions.addEventListener('change', updateCustomizeTotal);
+$('#customize-decrease').addEventListener('click', () => { state.quantity = Math.max(1, state.quantity - 1); updateCustomizeTotal(); });
+$('#customize-increase').addEventListener('click', () => { state.quantity = Math.min(99, state.quantity + 1); updateCustomizeTotal(); });
+$('#add-customized').addEventListener('click', () => {
+  if (!state.customizing) return;
+  addToCart(state.customizing, selectedOptions(), state.quantity);
+  closeModal(els.customizeModal);
+});
+$('#close-customize').addEventListener('click', () => closeModal(els.customizeModal));
+els.customizeImage.addEventListener('error', () => els.customizeImage.closest('.customize-media')?.classList.add('no-image'));
+
+els.cartItems.addEventListener('click', (event) => {
+  const button = event.target.closest('button[data-key]');
+  if (button) changeQuantity(button.dataset.key, Number(button.dataset.delta));
+});
+
+els.form.addEventListener('submit', (event) => {
+  event.preventDefault();
+  const error = validateForm();
+  if (error) { toast(error, 'error'); return; }
+  renderCheckoutSummary();
+  openModal(els.checkoutModal);
+});
+els.confirmCheckout.addEventListener('click', confirmOrder);
+$('#cancel-checkout').addEventListener('click', () => closeModal(els.checkoutModal));
+$('#close-checkout').addEventListener('click', () => closeModal(els.checkoutModal));
+
+[els.customizeModal, els.checkoutModal].forEach((modal) => {
+  modal.addEventListener('click', (event) => { if (event.target === modal) closeModal(modal); });
+});
+
+els.fab.addEventListener('click', () => setCartOpen(true));
+els.cartClose.addEventListener('click', () => setCartOpen(false));
+els.backdrop.addEventListener('click', () => setCartOpen(false));
+
+document.addEventListener('keydown', (event) => {
+  if (event.key !== 'Escape') return;
+  if (!els.checkoutModal.hidden) closeModal(els.checkoutModal);
+  else if (!els.customizeModal.hidden) closeModal(els.customizeModal);
+  else if (document.body.classList.contains('cart-open')) setCartOpen(false);
+});
+
+// ---------- inicialização ----------
+async function init() {
+  try { state.cart = JSON.parse(storage.get('pastifico-cart') || '[]'); } catch { state.cart = []; }
+  renderCart();
+
   try {
-    const [categoriesResponse, productsResponse] = await Promise.all([
-      fetch('/categories'),
-      fetch('/products')
-    ]);
-
-    if (!categoriesResponse.ok || !productsResponse.ok) {
-      throw new Error('Não foi possível carregar o cardápio');
-    }
-
-    state.categories = await categoriesResponse.json();
-    state.products = await productsResponse.json();
-
+    const { categories, products } = await window.Pastifico.getCatalog();
+    state.categories = categories;
+    state.products = products;
+    $('#fact-items').textContent = String(products.filter((product) => product.isAvailable).length);
+    // Descarta do carrinho salvo itens que não existem mais.
+    state.cart = state.cart.filter((item) => products.some((product) => product.id === item.productId && product.isAvailable));
+    saveCart();
     renderCategories();
     renderProducts();
     renderCart();
+    els.dataSource.textContent = window.Pastifico.mode === 'supabase' ? 'Dados em tempo real via Supabase' : 'Dados via API Node.js';
   } catch (error) {
-    productList.innerHTML = `<p class="cart-empty">${error.message}</p>`;
+    els.products.innerHTML = `<div class="empty-state"><span aria-hidden="true">⚠️</span><p>Não foi possível carregar o cardápio.<br /><small>${escapeHtml(error.message)}</small></p><button class="button button-ghost" type="button" onclick="location.reload()">Tentar novamente</button></div>`;
   }
 }
 
-orderForm.addEventListener('submit', (event) => {
-  event.preventDefault();
-
-  if (state.cart.length === 0) {
-    alert('Adicione pelo menos um item ao pedido.');
-    return;
-  }
-
-  const customerName = customerNameInput.value.trim();
-  const tableNumber = Number(tableNumberInput.value);
-
-  if (!customerName || !tableNumber) {
-    alert('Preencha o nome e a mesa antes de finalizar.');
-    return;
-  }
-
-  renderCheckoutSummary();
-  openCheckoutModal();
-});
-
-closeCheckout.addEventListener('click', closeCheckoutModal);
-cancelCheckout.addEventListener('click', closeCheckoutModal);
-
-confirmCheckout.addEventListener('click', async () => {
-  const customerName = customerNameInput.value.trim();
-  const tableNumber = Number(tableNumberInput.value);
-
-  if (!customerName || !tableNumber || state.cart.length === 0) {
-    closeCheckoutModal();
-    alert('Revise os dados do pedido antes de confirmar.');
-    return;
-  }
-
-  const payload = {
-    customerName,
-    tableNumber,
-    items: state.cart.map((item) => ({
-      productId: item.productId || item.id,
-      name: item.name,
-      quantity: item.quantity,
-      unitPrice: item.price,
-      options: item.options || []
-    })),
-    paymentMethod: state.paymentMethod
-  };
-
-  try {
-    const response = await fetch('/orders', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || 'Não foi possível concluir o pedido.');
-    }
-
-    const order = await response.json();
-    closeCheckoutModal();
-    state.cart = [];
-    orderForm.reset();
-    renderCart();
-    alert(`Pedido ${order.id} confirmado! Pagamento: ${state.paymentMethod} no caixa.`);
-    window.location.href = `/order-status?orderId=${encodeURIComponent(order.id)}`;
-  } catch (error) {
-    closeCheckoutModal();
-    alert(error.message);
-  }
-});
-
-paymentOptions.forEach((option) => {
-  option.addEventListener('click', () => {
-    const selectedValue = option.querySelector('input').value;
-    setPaymentMethod(selectedValue);
-  });
-});
-
-customerNameInput.addEventListener('input', () => {
-  if (!checkoutModal.classList.contains('hidden')) {
-    renderCheckoutSummary();
-  }
-});
-
-tableNumberInput.addEventListener('input', () => {
-  if (!checkoutModal.classList.contains('hidden')) {
-    renderCheckoutSummary();
-  }
-});
-
-loadCatalog();
-
-closeCustomize.addEventListener('click', closeCustomizeModal);
-customizeModal.addEventListener('click', (event) => {
-  if (event.target === customizeModal) closeCustomizeModal();
-});
-
-customizeDecrease.addEventListener('click', () => {
-  state.customizingQuantity = Math.max(1, state.customizingQuantity - 1);
-  customizeQuantity.textContent = String(state.customizingQuantity);
-});
-
-customizeIncrease.addEventListener('click', () => {
-  state.customizingQuantity += 1;
-  customizeQuantity.textContent = String(state.customizingQuantity);
-});
-
-addCustomized.addEventListener('click', () => {
-  if (!state.customizingProduct) return;
-  addToCart(state.customizingProduct, getSelectedCustomizations(), state.customizingQuantity);
-  closeCustomizeModal();
-});
-
-customizeImage.addEventListener('error', () => {
-  customizeImage.classList.add('image-broken');
-});
+init();

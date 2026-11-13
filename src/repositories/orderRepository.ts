@@ -6,11 +6,39 @@ import { productRepository } from './productRepository';
 import { isValidUuid } from '../utils/uuid';
 import { HttpError } from '../middlewares/errorHandler';
 
-interface OrderItemInput {
+/** Formato de cada item recebido no corpo de POST /orders. */
+export interface OrderItemInput {
   productId: string;
-  quantity?: number;
-  options?: string[];
+  quantity?: number | string;
+  options?: unknown;
 }
+
+interface OrderItemRow {
+  id: string;
+  product_id: string;
+  name: string;
+  quantity: number;
+  unit_price: number | string;
+  subtotal: number | string;
+  options: string[] | null;
+}
+
+interface OrderRow {
+  id: string;
+  customer_name: string;
+  table_number: number;
+  status: string;
+  total: number | string;
+  created_at: string;
+  payment_method: PaymentMethod | null;
+  payment_status: string | null;
+  order_items?: OrderItemRow[];
+}
+
+const MAX_QUANTITY_PER_ITEM = 99;
+
+/** Arredonda valores monetários para 2 casas, evitando 0.1 + 0.2 = 0.30000000000000004. */
+const roundMoney = (value: number): number => Math.round(value * 100) / 100;
 
 const foodOptionPrices: Record<string, number> = {
   'Molho extra da casa': 4,
@@ -48,24 +76,20 @@ const getAuthoritativeItemPrice = (productName: string, basePrice: number, optio
 
   if (dessertProductNames.has(productName)) {
     const extras = options.reduce((total, option) => {
-      if (!Object.prototype.hasOwnProperty.call(dessertOptionPrices, option)) {
-        throw new HttpError(400, 'Adicional de sobremesa inválido.');
-      }
+      if (!Object.prototype.hasOwnProperty.call(dessertOptionPrices, option)) throw new HttpError(400, 'Adicional de sobremesa inválido.');
       return total + dessertOptionPrices[option];
     }, 0);
     return price + extras;
   }
 
   const extras = options.reduce((total, option) => {
-    if (!Object.prototype.hasOwnProperty.call(foodOptionPrices, option)) {
-      throw new HttpError(400, 'Adicional de prato inválido.');
-    }
+    if (!Object.prototype.hasOwnProperty.call(foodOptionPrices, option)) throw new HttpError(400, 'Adicional de prato inválido.');
     return total + foodOptionPrices[option];
   }, 0);
   return price + extras;
 };
 
-const mapOrder = (row: any): Order => ({
+const mapOrder = (row: OrderRow): Order => ({
   id: row.id,
   customerName: row.customer_name,
   tableNumber: row.table_number,
@@ -74,7 +98,7 @@ const mapOrder = (row: any): Order => ({
   createdAt: row.created_at,
   paymentMethod: row.payment_method ?? 'Dinheiro',
   paymentStatus: row.payment_status === 'Pago' ? 'Pago' : 'Aguardando no caixa',
-  items: (row.order_items ?? []).map((item: any): OrderItem => ({
+  items: (row.order_items ?? []).map((item): OrderItem => ({
     id: item.id,
     productId: item.product_id,
     name: item.name,
@@ -92,20 +116,29 @@ const persistLocal = (orders: Order[]): void => {
   saveDatabase({ ...db, orders });
 };
 
-const buildOrderItems = async (items: OrderItemInput[]): Promise<OrderItem[]> => Promise.all(items.map(async (item) => {
-  const quantity = item.quantity ?? 1;
-  if (!Number.isInteger(quantity) || quantity < 1) throw new HttpError(400, 'A quantidade do item deve ser um inteiro maior que zero.');
-  if (!isValidUuid(item.productId)) throw new HttpError(400, 'O id do produto deve ser um UUID válido.');
+const buildOrderItems = async (items: OrderItemInput[]): Promise<OrderItem[]> => Promise.all(items.map(async (item, index) => {
+  if (typeof item !== 'object' || item === null || Array.isArray(item)) {
+    throw new HttpError(400, `O item ${index + 1} do pedido deve ser um objeto.`);
+  }
+
+  const quantity = Number(item.quantity ?? 1);
+  if (!Number.isInteger(quantity) || quantity < 1 || quantity > MAX_QUANTITY_PER_ITEM) {
+    throw new HttpError(400, `A quantidade do item ${index + 1} deve ser um inteiro entre 1 e ${MAX_QUANTITY_PER_ITEM}.`);
+  }
+
+  if (typeof item.productId !== 'string' || !isValidUuid(item.productId)) {
+    throw new HttpError(400, `O productId do item ${index + 1} deve ser um UUID válido.`);
+  }
 
   const product = await productRepository.findById(item.productId);
-  if (!product || !product.isAvailable) throw new HttpError(400, 'Produto não encontrado ou indisponível.');
+  if (!product || !product.isAvailable) throw new HttpError(400, `Produto do item ${index + 1} não encontrado ou indisponível.`);
 
-  const options = item.options ?? [];
-  if (!Array.isArray(options) || !options.every((option) => typeof option === 'string')) {
-    throw new HttpError(400, 'Os adicionais do item devem ser uma lista de textos.');
+  if (item.options !== undefined && !Array.isArray(item.options)) {
+    throw new HttpError(400, `O campo options do item ${index + 1} deve ser uma lista de textos.`);
   }
-  const unitPrice = getAuthoritativeItemPrice(product.name, product.price, options);
-  const subtotal = quantity * unitPrice;
+  const options = Array.isArray(item.options) ? item.options.filter((option: unknown): option is string => typeof option === 'string') : [];
+  const unitPrice = roundMoney(getAuthoritativeItemPrice(product.name, product.price, options));
+  const subtotal = roundMoney(quantity * unitPrice);
 
   return {
     id: randomUUID(),
@@ -150,7 +183,7 @@ export const orderRepository = {
 
   async create(customerName: string, tableNumber: number, items: OrderItemInput[], paymentMethod: PaymentMethod = 'Dinheiro'): Promise<Order> {
     const orderItems = await buildOrderItems(items);
-    const total = orderItems.reduce((sum, item) => sum + item.subtotal, 0);
+    const total = roundMoney(orderItems.reduce((sum, item) => sum + item.subtotal, 0));
     const paymentStatus: PaymentStatus = 'Aguardando no caixa';
 
     if (isSupabaseConfigured()) {
@@ -176,9 +209,16 @@ export const orderRepository = {
         subtotal: item.subtotal,
         options: item.options ?? []
       })));
-      if (itemsError) throw itemsError;
+      if (itemsError) {
+        // Sem transação no PostgREST: desfaz o pedido para não deixar um registro sem itens.
+        await supabase.from('orders').delete().eq('id', order.id);
+        throw itemsError;
+      }
 
-      return mapOrder({ ...order, payment_method: paymentMethod, payment_status: paymentStatus, order_items: orderItems });
+      return {
+        ...mapOrder({ ...order, payment_method: paymentMethod, payment_status: paymentStatus, order_items: [] }),
+        items: orderItems
+      };
     }
 
     const order: Order = {

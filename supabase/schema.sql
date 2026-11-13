@@ -48,6 +48,7 @@ alter table public.order_items add column if not exists options text[] not null 
 create index if not exists products_category_id_idx on public.products(category_id);
 create index if not exists orders_created_at_idx on public.orders(created_at desc);
 create index if not exists order_items_order_id_idx on public.order_items(order_id);
+create index if not exists order_items_product_id_idx on public.order_items(product_id);
 
 alter table public.categories enable row level security;
 alter table public.products enable row level security;
