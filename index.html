@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="description" content="Pastifico — cardápio de autoatendimento de massas italianas artesanais." />
+    <meta name="theme-color" content="#120d0b" />
+    <title>Pastifico | Cardápio</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="menu-page">
+    <div class="intro" id="intro" role="dialog" aria-modal="true" aria-labelledby="intro-title">
+      <div class="intro-welcome">
+        <img class="intro-logo" src="logo-pastifico-claro.svg" alt="Pastifico" width="529" height="200" />
+        <p class="intro-kicker">Benvenuti</p>
+        <p class="intro-title" id="intro-title">Massa fresca,<br /><em>feita na hora.</em></p>
+        <button class="button intro-cta" type="button">Fazer pedido</button>
+        <p class="intro-hint">ou toque em qualquer lugar da tela</p>
+      </div>
+      <div class="intro-center" aria-hidden="true">
+        <img class="intro-logo intro-logo-big" src="logo-pastifico-claro.svg" alt="" width="529" height="200" />
+        <span class="intro-loader"><span></span></span>
+      </div>
+    </div>
+
+    <a class="skip-link" href="#menu">Pular para o cardápio</a>
+
+    <header class="site-header">
+      <div class="site-header-inner">
+        <a class="brand" href="index.html" aria-label="Pastifico — início">
+          <img class="brand-logo" src="logo-pastifico-claro.svg" alt="Pastifico" width="529" height="200" />
+        </a>
+        <nav class="site-nav" aria-label="Navegação principal">
+          <a href="#menu">Cardápio</a>
+          <a href="order-status.html">Meu pedido</a>
+        </nav>
+        <span class="open-pill"><span class="pulse-dot" aria-hidden="true"></span>Aberto agora</span>
+      </div>
+    </header>
+
+
+    <main class="menu-layout" id="menu">
+      <section class="menu-column" aria-labelledby="menu-title">
+        <div class="menu-toolbar">
+          <div class="menu-heading">
+            <p class="kicker">La tavola</p>
+            <h2 id="menu-title">Cardápio</h2>
+          </div>
+          <label class="search">
+            <span class="sr-only">Buscar no cardápio</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.5 3a7.5 7.5 0 0 1 5.9 12.13l4.24 4.23-1.42 1.42-4.23-4.24A7.5 7.5 0 1 1 10.5 3Zm0 2a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11Z" /></svg>
+            <input id="search" type="search" placeholder="Buscar prato, vinho..." autocomplete="off" />
+          </label>
+        </div>
+
+        <div class="category-bar" role="tablist" aria-label="Categorias" id="categories"></div>
+
+        <div id="products" class="menu-sections" aria-live="polite">
+          <div class="product-grid">
+            <div class="product-card skeleton"></div><div class="product-card skeleton"></div><div class="product-card skeleton"></div>
+            <div class="product-card skeleton"></div><div class="product-card skeleton"></div><div class="product-card skeleton"></div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="cart" id="cart" aria-labelledby="cart-title">
+        <div class="cart-sheet">
+          <div class="cart-header">
+            <h2 id="cart-title">Seu pedido</h2>
+            <span class="cart-count" id="cart-count">0 itens</span>
+            <button class="icon-button cart-close" id="cart-close" type="button" aria-label="Fechar pedido">×</button>
+          </div>
+
+          <div id="cart-items" class="cart-items"></div>
+
+          <form id="order-form" class="order-form" novalidate>
+            <div class="field-row">
+              <label class="field">
+                <span>Seu nome</span>
+                <input id="customerName" name="customerName" type="text" maxlength="100" placeholder="Como chamamos você?" autocomplete="given-name" required />
+              </label>
+              <label class="field field-small">
+                <span>Mesa</span>
+                <input id="tableNumber" name="tableNumber" type="number" inputmode="numeric" min="1" max="999" placeholder="5" required />
+              </label>
+            </div>
+
+            <fieldset class="payment">
+              <legend>Pagamento no caixa</legend>
+              <div class="segmented">
+                <label><input type="radio" name="paymentMethod" value="Cartão" checked /><span>Cartão</span></label>
+                <label><input type="radio" name="paymentMethod" value="PIX" /><span>PIX</span></label>
+                <label><input type="radio" name="paymentMethod" value="Dinheiro" /><span>Dinheiro</span></label>
+              </div>
+            </fieldset>
+
+            <div class="cart-total">
+              <span>Total</span>
+              <strong id="total">R$ 0,00</strong>
+            </div>
+
+            <button type="submit" class="button button-primary button-block" id="checkout-button">Revisar pedido</button>
+          </form>
+        </div>
+      </aside>
+    </main>
+
+    <button class="cart-fab" id="cart-fab" type="button" aria-controls="cart" aria-expanded="false">
+      <span class="cart-fab-count" id="cart-fab-count">0</span>
+      <span>Ver pedido</span>
+      <strong id="cart-fab-total">R$ 0,00</strong>
+    </button>
+    <div class="backdrop" id="cart-backdrop" hidden></div>
+
+    <footer class="site-footer">
+      <p>Pastifico · Projeto acadêmico de Back-End por <strong>Leonardo Hamilton Moreira de Camargo</strong></p>
+      <p class="data-source" id="data-source"></p>
+    </footer>
+
+    <div id="customize-modal" class="modal" hidden>
+      <div class="modal-card customize-card" role="dialog" aria-modal="true" aria-labelledby="customize-title">
+        <button id="close-customize" class="icon-button modal-close" type="button" aria-label="Fechar">×</button>
+        <div class="customize-media"><img id="customize-image" src="" alt="" /></div>
+        <div class="customize-body">
+          <p class="kicker">Monte do seu jeito</p>
+          <h3 id="customize-title"></h3>
+          <p id="customize-description" class="muted"></p>
+          <div id="customize-options" class="option-list"></div>
+          <div class="customize-footer">
+            <div class="stepper" aria-label="Quantidade">
+              <button id="customize-decrease" type="button" aria-label="Diminuir quantidade">−</button>
+              <output id="customize-quantity" aria-live="polite">1</output>
+              <button id="customize-increase" type="button" aria-label="Aumentar quantidade">+</button>
+            </div>
+            <button id="add-customized" class="button button-primary" type="button">
+              Adicionar · <span id="customize-total">R$ 0,00</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="checkout-modal" class="modal" hidden>
+      <div class="modal-card checkout-card" role="dialog" aria-modal="true" aria-labelledby="checkout-title">
+        <button id="close-checkout" class="icon-button modal-close" type="button" aria-label="Fechar">×</button>
+        <p class="kicker">Confirmação</p>
+        <h3 id="checkout-title">Tudo certo com o pedido?</h3>
+        <div id="checkout-summary" class="checkout-summary"></div>
+        <p class="muted small">O valor final é recalculado pelo sistema. O pagamento é feito no caixa.</p>
+        <div class="modal-actions">
+          <button id="cancel-checkout" class="button button-ghost" type="button">Voltar</button>
+          <button id="confirm-checkout" class="button button-primary" type="button">Confirmar pedido</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="api.js"></script>
+    <script src="motion.js"></script>
+    <script src="app.js"></script>
+    <script src="intro.js"></script>
+  </body>
+</html>
