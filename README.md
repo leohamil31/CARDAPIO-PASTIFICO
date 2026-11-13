@@ -212,7 +212,7 @@ Todas as chaves primárias usam `uuid` (gerado com `gen_random_uuid()`), e as re
 Para reproduzir a estrutura em um projeto Supabase novo:
 
 1. Abra o **SQL Editor** do seu projeto Supabase.
-2. Execute o conteúdo de [`supabase/schema.sql`](./supabase/schema.sql) e depois [`supabase/public-access.sql`](./supabase/public-access.sql) (necessário para a versão do GitHub Pages).
+2. No SQL Editor, execute nesta ordem: [`supabase/schema.sql`](./supabase/schema.sql), [`supabase/public-access.sql`](./supabase/public-access.sql) e [`supabase/staff-only-orders.sql`](./supabase/staff-only-orders.sql). Os dois últimos são necessários para a versão do GitHub Pages; depois defina o PIN da cozinha com `select private.set_kitchen_pin('SEU-PIN');`.
 3. (Opcional) Para carregar o catálogo inicial de exemplo (4 categorias e 27 produtos) a partir do `data/pastifico-db.json`, rode:
 
    ```powershell

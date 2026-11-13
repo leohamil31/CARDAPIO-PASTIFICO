@@ -6,7 +6,7 @@
 (function () {
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
-  const TARGETS = '.button, .chip, .add-button, .stepper button, .icon-button, .tool-button, .site-nav a, .site-nav-button, .cart-fab, .segmented label, .option';
+  const TARGETS = '.button, .chip, .add-button, .stepper button, .icon-button, .tool-button, .site-nav a, .cart-fab, .segmented label, .option';
 
   document.addEventListener('pointerdown', (event) => {
     const target = event.target.closest(TARGETS);

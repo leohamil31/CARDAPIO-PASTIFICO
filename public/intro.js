@@ -16,16 +16,14 @@
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const behind = Array.from(document.body.children).filter((element) => element !== intro && element.tagName !== 'SCRIPT');
 
-  const finish = (played = true) => {
-    // Evita que as animações de entrada padrão do hero rodem de novo depois da abertura.
-    if (played) document.body.classList.add('intro-done');
+  const finish = () => {
     intro.remove();
     document.body.classList.remove('intro-active', 'intro-reveal', 'no-scroll');
     behind.forEach((element) => element.removeAttribute('inert'));
   };
 
   if (skip) {
-    finish(false);
+    finish();
     return;
   }
 

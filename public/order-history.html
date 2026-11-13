@@ -5,30 +5,32 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#120d0b" />
     <title>Pastifico | Histórico de pedidos</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍝</text></svg>" />
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="styles.css" />
   </head>
-  <body class="history-page">
-    <header class="site-header">
+  <body class="staff-page history-page">
+    <header class="site-header staff-header">
       <div class="site-header-inner">
-        <a class="brand" href="kitchen.html" aria-label="Pastifico — painel da equipe">
+        <a class="brand" href="kitchen.html" aria-label="Pastifico — painel da cozinha">
           <img class="brand-logo" src="logo-pastifico-claro.svg" alt="Pastifico" width="529" height="200" />
         </a>
-        <nav class="site-nav" aria-label="Navegação da equipe">
-          <a href="kitchen.html">Cozinha</a>
-          <a href="order-history.html" aria-current="page">Histórico</a>
-          <button class="site-nav-button" type="button" onclick="window.Pastifico.logoutStaff()">Sair</button>
-        </nav>
+        <div class="page-title">
+          <p class="kicker">Área da equipe</p>
+          <h1>Histórico</h1>
+        </div>
+        <div class="header-tools">
+          <a class="tool-button" href="kitchen.html">Cozinha</a>
+          <a class="tool-button" href="order-history.html" aria-current="page">Histórico</a>
+          <button class="tool-button" id="logout-button" type="button">Sair</button>
+        </div>
       </div>
     </header>
 
     <main class="narrow wide">
       <div class="page-heading">
-        <p class="kicker">Registro</p>
-        <h1>Histórico de pedidos</h1>
         <div class="filters" role="group" aria-label="Filtrar por status" id="filters">
           <button class="chip active" data-filter="all" type="button">Todos</button>
           <button class="chip" data-filter="Recebido" type="button">Recebidos</button>

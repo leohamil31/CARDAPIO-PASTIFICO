@@ -336,7 +336,7 @@ function renderCart() {
 
   els.cartItems.innerHTML = state.cart.map((item) => `
     <div class="cart-item">
-      <img src="${escapeHtml(item.image)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'" />
+      <img src="${escapeHtml(item.image)}" alt="" loading="lazy" />
       <div class="cart-item-info">
         <strong>${escapeHtml(item.name)}</strong>
         <small>${item.options.length ? escapeHtml(item.options.join(' · ')) : 'Receita original'}</small>
@@ -496,6 +496,15 @@ $('#add-customized').addEventListener('click', () => {
 $('#close-customize').addEventListener('click', () => closeModal(els.customizeModal));
 els.customizeImage.addEventListener('error', () => els.customizeImage.closest('.customize-media')?.classList.add('no-image'));
 
+// Foto que não carrega no carrinho: esconde a imagem quebrada (o evento "error" não borbulha, por isso a captura).
+els.cartItems.addEventListener('error', (event) => {
+  if (event.target.tagName === 'IMG') event.target.classList.add('img-missing');
+}, true);
+
+els.products.addEventListener('click', (event) => {
+  if (event.target.closest('[data-action="reload"]')) location.reload();
+});
+
 els.cartItems.addEventListener('click', (event) => {
   const button = event.target.closest('button[data-key]');
   if (button) changeQuantity(button.dataset.key, Number(button.dataset.delta));
@@ -546,7 +555,7 @@ async function init() {
     renderCart();
     els.dataSource.textContent = window.Pastifico.mode === 'supabase' ? 'Dados em tempo real via Supabase' : 'Dados via API Node.js';
   } catch (error) {
-    els.products.innerHTML = `<div class="empty-state"><p>Não foi possível carregar o cardápio.<br /><small>${escapeHtml(error.message)}</small></p><button class="button button-ghost" type="button" onclick="location.reload()">Tentar novamente</button></div>`;
+    els.products.innerHTML = `<div class="empty-state"><p>Não foi possível carregar o cardápio.<br /><small>${escapeHtml(error.message)}</small></p><button class="button button-ghost" type="button" data-action="reload">Tentar novamente</button></div>`;
   }
 }
 

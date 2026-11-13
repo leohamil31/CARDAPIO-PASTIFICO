@@ -2,6 +2,7 @@ const { escapeHtml, formatCurrency } = window.Pastifico;
 
 const panel = document.querySelector('#history-panel');
 const filters = document.querySelector('#filters');
+document.querySelector('#logout-button').addEventListener('click', () => window.Pastifico.logoutStaff());
 let orders = [];
 let filter = 'all';
 
