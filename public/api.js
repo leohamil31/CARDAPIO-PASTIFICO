@@ -242,7 +242,7 @@
       gate.className = 'modal staff-gate open';
       gate.innerHTML = `
         <form class="modal-card pin-card" role="dialog" aria-modal="true" aria-labelledby="gate-title">
-          <span class="brand-mark gate-mark" aria-hidden="true">P</span>
+          <img class="brand-logo gate-logo" src="logo-pastifico-claro.svg" alt="Pastifico" />
           <p class="kicker">Área da equipe</p>
           <h3 id="gate-title">Acesso restrito</h3>
           <p class="muted small">Esta tela é só para os funcionários do Pastifico. Informe o PIN da cozinha.</p>
