@@ -3,7 +3,7 @@ const { escapeHtml, formatCurrency, toast, storage } = window.Pastifico;
 const state = {
   categories: [],
   products: [],
-  selectedCategory: 'all',
+  activeCategory: null,
   search: '',
   cart: [],
   customizing: null,
@@ -88,23 +88,88 @@ function priceWith(product, options) {
 function filteredProducts() {
   const term = state.search.trim().toLowerCase();
   return state.products.filter((product) => {
-    if (state.selectedCategory !== 'all' && product.categoryId !== state.selectedCategory) return false;
     if (!term) return true;
     return `${product.name} ${product.description}`.toLowerCase().includes(term);
   });
 }
 
+// As categorias funcionam como um índice: tocar leva até a seção, e a categoria
+// destacada acompanha a rolagem da página (scroll-spy).
 function renderCategories() {
-  const all = [{ id: 'all', name: 'Todos' }, ...state.categories];
-  els.categories.innerHTML = all.map((category) => {
-    const count = category.id === 'all' ? state.products.length : state.products.filter((p) => p.categoryId === category.id).length;
-    const active = state.selectedCategory === category.id;
+  const visible = state.categories.filter((category) => state.products.some((p) => p.categoryId === category.id));
+  if (!state.activeCategory && visible.length) state.activeCategory = visible[0].id;
+  els.categories.innerHTML = '<span class="chip-indicator" aria-hidden="true"></span>' + visible.map((category) => {
+    const count = state.products.filter((p) => p.categoryId === category.id).length;
+    const active = state.activeCategory === category.id;
     return `
       <button class="chip ${active ? 'active' : ''}" role="tab" aria-selected="${active}" data-category="${escapeHtml(category.id)}" type="button">
         ${escapeHtml(category.name)}
         <small>${count}</small>
       </button>`;
   }).join('');
+  requestAnimationFrame(() => moveIndicator(false));
+}
+
+/** Move a "pílula" verde para baixo da categoria ativa e centraliza ela na barra. */
+function moveIndicator(animate = true) {
+  const indicator = els.categories.querySelector('.chip-indicator');
+  const chip = els.categories.querySelector('.chip.active');
+  if (!indicator || !chip) return;
+  indicator.classList.toggle('no-anim', !animate);
+  indicator.style.width = `${chip.offsetWidth}px`;
+  indicator.style.height = `${chip.offsetHeight}px`;
+  indicator.style.transform = `translate(${chip.offsetLeft}px, ${chip.offsetTop}px)`;
+  const left = chip.offsetLeft - els.categories.clientWidth / 2 + chip.offsetWidth / 2;
+  els.categories.scrollTo({ left, behavior: animate ? 'smooth' : 'auto' });
+}
+
+function setActiveCategory(id, animate = true) {
+  if (!id || state.activeCategory === id) return;
+  state.activeCategory = id;
+  els.categories.querySelectorAll('.chip').forEach((chip) => {
+    const active = chip.dataset.category === id;
+    chip.classList.toggle('active', active);
+    chip.setAttribute('aria-selected', String(active));
+  });
+  moveIndicator(animate);
+}
+
+/** Distância do topo da tela até onde o conteúdo começa (cabeçalho + barra de categorias). */
+const stickyOffset = () => {
+  const header = document.querySelector('.site-header');
+  return (header ? header.offsetHeight : 0) + els.categories.offsetHeight + 12;
+};
+
+let spyLocked = false;
+let spyFrame = null;
+function updateActiveFromScroll() {
+  spyFrame = null;
+  if (spyLocked || state.search) return;
+  const sections = Array.from(document.querySelectorAll('.menu-section[data-section]'));
+  if (!sections.length) return;
+  const offset = stickyOffset() + 8;
+  let current = sections[0];
+  for (const section of sections) {
+    if (section.getBoundingClientRect().top - offset <= 0) current = section;
+  }
+  // No fim da página a última seção pode não chegar ao topo: ativa ela mesmo assim.
+  if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4) current = sections[sections.length - 1];
+  setActiveCategory(current.dataset.section);
+}
+window.addEventListener('scroll', () => { if (!spyFrame) spyFrame = requestAnimationFrame(updateActiveFromScroll); }, { passive: true });
+window.addEventListener('resize', () => moveIndicator(false));
+window.addEventListener('scrollend', () => updateActiveFromScroll());
+
+function scrollToCategory(id) {
+  const section = document.querySelector(`.menu-section[data-section="${CSS.escape(id)}"]`);
+  if (!section) return;
+  setActiveCategory(id);
+  spyLocked = true;
+  const top = section.getBoundingClientRect().top + window.scrollY - stickyOffset() + 2;
+  window.scrollTo({ top, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  const release = () => { spyLocked = false; window.removeEventListener('scrollend', release); };
+  window.addEventListener('scrollend', release, { once: true });
+  setTimeout(release, 1000);
 }
 
 function productCard(product, index) {
@@ -135,12 +200,12 @@ function renderProducts() {
     return;
   }
 
-  if (state.selectedCategory === 'all' && !state.search) {
+  if (!state.search) {
     els.products.innerHTML = state.categories.map((category) => {
       const items = products.filter((product) => product.categoryId === category.id);
       if (!items.length) return '';
       return `
-        <section class="menu-section" aria-labelledby="cat-${escapeHtml(category.id)}">
+        <section class="menu-section" data-section="${escapeHtml(category.id)}" aria-labelledby="cat-${escapeHtml(category.id)}">
           <header class="menu-section-header">
             <h3 id="cat-${escapeHtml(category.id)}">${escapeHtml(category.name)}</h3>
             <p>${escapeHtml(category.description || '')}</p>
@@ -285,6 +350,26 @@ function renderCart() {
     </div>`).join('');
 }
 
+/** A foto do prato "voa" até o carrinho (ou até o botão "Ver pedido" no celular). */
+function flyToCart(source) {
+  if (!source || !source.src || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const target = getComputedStyle(els.fab).display !== 'none' ? els.fab : els.cartCount;
+  const from = source.getBoundingClientRect();
+  const to = target.getBoundingClientRect();
+  if (!from.width || !to.width) return;
+  const ghost = source.cloneNode();
+  ghost.className = 'fly-ghost';
+  Object.assign(ghost.style, { left: `${from.left}px`, top: `${from.top}px`, width: `${from.width}px`, height: `${from.height}px` });
+  document.body.appendChild(ghost);
+  const dx = to.left + to.width / 2 - (from.left + from.width / 2);
+  const dy = to.top + to.height / 2 - (from.top + from.height / 2);
+  ghost.animate([
+    { transform: 'translate(0, 0) scale(1)', opacity: 1, borderRadius: '20px' },
+    { transform: `translate(${dx * 0.55}px, ${dy * 0.35 - 80}px) scale(0.45)`, opacity: 0.95, borderRadius: '40%', offset: 0.55 },
+    { transform: `translate(${dx}px, ${dy}px) scale(0.08)`, opacity: 0.3, borderRadius: '50%' }
+  ], { duration: 750, easing: 'cubic-bezier(0.5, 0, 0.2, 1)' }).finished.then(() => ghost.remove(), () => ghost.remove());
+}
+
 function bump(element) {
   element.classList.remove('bump');
   void element.offsetWidth; // reinicia a animação
@@ -304,7 +389,7 @@ function openModal(modal) {
 function closeModal(modal) {
   modal.classList.remove('open');
   document.body.classList.remove('no-scroll');
-  setTimeout(() => { modal.hidden = true; }, 220);
+  setTimeout(() => { modal.hidden = true; updateActiveFromScroll(); }, 220);
   lastFocus?.focus?.();
 }
 
@@ -369,10 +454,13 @@ async function confirmOrder() {
 els.categories.addEventListener('click', (event) => {
   const button = event.target.closest('[data-category]');
   if (!button) return;
-  state.selectedCategory = button.dataset.category;
-  renderCategories();
-  renderProducts();
-  button.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+  if (state.search) {
+    // Tocar numa categoria durante a busca limpa a busca e volta ao cardápio completo.
+    state.search = '';
+    els.search.value = '';
+    renderProducts();
+  }
+  scrollToCategory(button.dataset.category);
 });
 
 let searchTimer;
@@ -401,6 +489,7 @@ $('#customize-decrease').addEventListener('click', () => { state.quantity = Math
 $('#customize-increase').addEventListener('click', () => { state.quantity = Math.min(99, state.quantity + 1); updateCustomizeTotal(); });
 $('#add-customized').addEventListener('click', () => {
   if (!state.customizing) return;
+  flyToCart(els.customizeImage);
   addToCart(state.customizing, selectedOptions(), state.quantity);
   closeModal(els.customizeModal);
 });
