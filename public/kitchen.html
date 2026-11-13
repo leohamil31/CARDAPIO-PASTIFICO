@@ -14,7 +14,7 @@
   <body class="kitchen-page">
     <header class="kitchen-header">
       <div class="kitchen-title">
-        <a class="brand brand-light" href="index.html" aria-label="Voltar ao cardápio">
+        <a class="brand brand-light" href="kitchen.html" aria-label="Painel da cozinha">
           <span class="brand-mark" aria-hidden="true">P</span>
         </a>
         <div>
@@ -26,7 +26,8 @@
         <span class="live-status" id="live-status" data-state="connecting"><span class="pulse-dot" aria-hidden="true"></span><span id="live-label">Conectando…</span></span>
         <time class="clock" id="clock" aria-label="Hora atual"></time>
         <button class="tool-button" id="sound-toggle" type="button" aria-pressed="false" title="Aviso sonoro de novo pedido">🔕 Som</button>
-        <button class="tool-button" id="pin-button" type="button" hidden>🔒 Entrar</button>
+        <a class="tool-button" href="order-history.html">Histórico</a>
+        <button class="tool-button" id="logout-button" type="button" hidden>Sair</button>
       </div>
     </header>
 
@@ -44,20 +45,6 @@
         <div class="kitchen-list" data-list="Pronto"></div>
       </section>
     </main>
-
-    <div id="pin-modal" class="modal" hidden>
-      <form class="modal-card pin-card" role="dialog" aria-modal="true" aria-labelledby="pin-title" id="pin-form">
-        <button class="icon-button modal-close" type="button" id="pin-close" aria-label="Fechar">×</button>
-        <p class="kicker">Acesso da equipe</p>
-        <h3 id="pin-title">PIN da cozinha</h3>
-        <p class="muted small">Qualquer pessoa pode acompanhar os pedidos. Para mudar o status, informe o PIN.</p>
-        <input id="pin-input" class="pin-input" type="password" inputmode="numeric" autocomplete="off" maxlength="12" placeholder="••••••" required />
-        <p class="form-error" id="pin-error" role="alert"></p>
-        <div class="modal-actions">
-          <button class="button button-primary button-block" type="submit">Entrar</button>
-        </div>
-      </form>
-    </div>
 
     <script src="config.js"></script>
     <script src="api.js"></script>

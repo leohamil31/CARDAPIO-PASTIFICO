@@ -8,7 +8,7 @@ let filter = 'all';
 function render() {
   const list = orders.filter((order) => filter === 'all' || order.status === filter);
   if (!list.length) {
-    panel.innerHTML = '<div class="empty-state"><span aria-hidden="true">📭</span><p>Nenhum pedido por aqui.</p></div>';
+    panel.innerHTML = '<div class="empty-state"><p>Nenhum pedido por aqui.</p></div>';
     return;
   }
 
@@ -33,7 +33,8 @@ async function load() {
     orders = (await window.Pastifico.listOrders({ limit: 100 })).reverse();
     render();
   } catch (error) {
-    panel.innerHTML = `<div class="empty-state"><span aria-hidden="true">⚠️</span><p>${escapeHtml(error.message)}</p></div>`;
+    if (/PIN/i.test(error.message)) window.Pastifico.logoutStaff();
+    panel.innerHTML = `<div class="empty-state"><p>${escapeHtml(error.message)}</p></div>`;
   }
 }
 
@@ -45,5 +46,11 @@ filters.addEventListener('click', (event) => {
   render();
 });
 
-load();
-window.Pastifico.subscribeOrders(load);
+window.Pastifico.requireStaff()
+  .then(() => {
+    load();
+    window.Pastifico.subscribeOrders(load);
+  })
+  .catch((error) => {
+    panel.innerHTML = `<div class="empty-state"><p>${escapeHtml(error.message)}</p></div>`;
+  });
