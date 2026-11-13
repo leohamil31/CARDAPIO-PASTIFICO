@@ -204,7 +204,17 @@ p { margin: 0; }
 .product-media { position: relative; aspect-ratio: 4 / 3; overflow: hidden; background: linear-gradient(135deg, #f1e3cf, #e8d2b4); }
 .product-media img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.7s var(--ease); }
 .product-media.no-image img { display: none; }
-.product-media.no-image::after { content: '🍝'; position: absolute; inset: 0; display: grid; place-items: center; font-size: 3rem; }
+.product-media.no-image, .customize-media.no-image {
+  display: grid; place-items: center; padding: 18px;
+  background:
+    linear-gradient(90deg, var(--verde) 0 33.34%, var(--bianco) 33.34% 66.67%, var(--rosso) 66.67% 100%) center calc(50% + 34px) / 54px 5px no-repeat,
+    radial-gradient(circle at 50% 45%, #ffffff 0 30%, transparent 70%),
+    #f1ece3;
+}
+.product-media.no-image::after, .customize-media.no-image::after {
+  content: 'P'; font-family: var(--font-display); font-weight: 700; font-size: 3.4rem; line-height: 1;
+  color: rgba(206, 43, 55, 0.22); transform: translateY(-8px);
+}
 .badge { position: absolute; top: 12px; left: 12px; padding: 4px 10px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; background: var(--paper); }
 .badge-muted { background: var(--ink); color: #fff; }
 

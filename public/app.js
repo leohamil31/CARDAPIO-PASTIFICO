@@ -55,7 +55,6 @@ const DESSERT_OPTIONS = [
 ];
 const WINES = ['Vinho Toscano', 'Chianti Classico', 'Pinot Grigio delle Venezie', 'Prosecco Veneto', 'Montepulciano d’Abruzzo'];
 const SODAS = ['Coca-Cola 600ml', 'Guaraná Antarctica 600ml', 'Fanta Laranja 600ml'];
-const CATEGORY_ICONS = { Massas: '🍝', Entradas: '🥖', Bebidas: '🍷', Sobremesas: '🍮' };
 
 function getOptions(product) {
   if (WINES.includes(product.name)) {
@@ -102,7 +101,6 @@ function renderCategories() {
     const active = state.selectedCategory === category.id;
     return `
       <button class="chip ${active ? 'active' : ''}" role="tab" aria-selected="${active}" data-category="${escapeHtml(category.id)}" type="button">
-        ${CATEGORY_ICONS[category.name] ? `<span aria-hidden="true">${CATEGORY_ICONS[category.name]}</span>` : ''}
         ${escapeHtml(category.name)}
         <small>${count}</small>
       </button>`;
@@ -114,7 +112,7 @@ function productCard(product, index) {
   return `
     <article class="product-card reveal ${unavailable ? 'is-unavailable' : ''}" style="--i:${index % 9}" data-product-id="${escapeHtml(product.id)}"
       tabindex="${unavailable ? -1 : 0}" role="button" aria-label="${escapeHtml(product.name)}, ${formatCurrency(product.price)}${unavailable ? ', indisponível' : ''}">
-      <div class="product-media">
+      <div class="product-media" data-name="${escapeHtml(product.name)}">
         <img src="${escapeHtml(product.image)}" alt="" loading="lazy" decoding="async" />
         ${unavailable ? '<span class="badge badge-muted">Indisponível</span>' : ''}
       </div>
@@ -133,7 +131,7 @@ function renderProducts() {
   const products = filteredProducts();
 
   if (!products.length) {
-    els.products.innerHTML = `<div class="empty-state"><span aria-hidden="true">🔎</span><p>Nenhum item encontrado${state.search ? ` para “${escapeHtml(state.search)}”` : ''}.</p></div>`;
+    els.products.innerHTML = `<div class="empty-state"><p>Nenhum item encontrado${state.search ? ` para “${escapeHtml(state.search)}”` : ''}.</p></div>`;
     return;
   }
 
@@ -154,7 +152,7 @@ function renderProducts() {
     els.products.innerHTML = `<div class="product-grid">${products.map(productCard).join('')}</div>`;
   }
 
-  els.products.querySelectorAll('img').forEach((image) => {
+  els.products.querySelectorAll('.product-media img').forEach((image) => {
     image.addEventListener('error', () => image.closest('.product-media')?.classList.add('no-image'), { once: true });
   });
   observeReveal();
@@ -197,6 +195,8 @@ function openCustomize(product) {
   if (!product?.isAvailable) return;
   state.customizing = product;
   state.quantity = 1;
+  els.customizeImage.closest('.customize-media').classList.remove('no-image');
+  els.customizeImage.closest('.customize-media').dataset.name = product.name;
   els.customizeImage.src = product.image;
   els.customizeImage.alt = product.name;
   els.customizeTitle.textContent = product.name;
@@ -210,7 +210,7 @@ function openCustomize(product) {
           <span class="option-name">${escapeHtml(option.name)}</span>
           <span class="option-price">${Number.isFinite(option.replacePrice) ? formatCurrency(option.replacePrice) : `+ ${formatCurrency(option.price)}`}</span>
         </label>`).join('')
-    : '<p class="muted">Este item já vem pronto para servir. 🍽️</p>';
+    : '<p class="muted">Este item já vem pronto para servir.</p>';
 
   updateCustomizeTotal();
   openModal(els.customizeModal);
@@ -265,13 +265,13 @@ function renderCart() {
   els.fab.classList.toggle('visible', quantity > 0);
 
   if (!state.cart.length) {
-    els.cartItems.innerHTML = '<div class="cart-empty"><span aria-hidden="true">🍝</span><p>Seu pedido está vazio.<br />Toque em um prato para começar.</p></div>';
+    els.cartItems.innerHTML = '<div class="cart-empty"><span class="tricolore" aria-hidden="true"></span><p>Seu pedido está vazio.<br />Toque em um prato para começar.</p></div>';
     return;
   }
 
   els.cartItems.innerHTML = state.cart.map((item) => `
     <div class="cart-item">
-      <img src="${escapeHtml(item.image)}" alt="" loading="lazy" />
+      <img src="${escapeHtml(item.image)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'" />
       <div class="cart-item-info">
         <strong>${escapeHtml(item.name)}</strong>
         <small>${item.options.length ? escapeHtml(item.options.join(' · ')) : 'Receita original'}</small>
@@ -456,7 +456,7 @@ async function init() {
     renderCart();
     els.dataSource.textContent = window.Pastifico.mode === 'supabase' ? 'Dados em tempo real via Supabase' : 'Dados via API Node.js';
   } catch (error) {
-    els.products.innerHTML = `<div class="empty-state"><span aria-hidden="true">⚠️</span><p>Não foi possível carregar o cardápio.<br /><small>${escapeHtml(error.message)}</small></p><button class="button button-ghost" type="button" onclick="location.reload()">Tentar novamente</button></div>`;
+    els.products.innerHTML = `<div class="empty-state"><p>Não foi possível carregar o cardápio.<br /><small>${escapeHtml(error.message)}</small></p><button class="button button-ghost" type="button" onclick="location.reload()">Tentar novamente</button></div>`;
   }
 }
 
