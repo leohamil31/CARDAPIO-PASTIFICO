@@ -1,106 +1,237 @@
-const newOrdersPanel = document.querySelector('#new-orders-panel');
-const readyOrdersPanel = document.querySelector('#ready-orders-panel');
-const newOrdersCount = document.querySelector('#new-orders-count');
-const readyOrdersCount = document.querySelector('#ready-orders-count');
-let kitchenOrders = [];
+const { escapeHtml, formatCurrency, timeAgo, toast, storage } = window.Pastifico;
 
-async function loadKitchenOrders() {
+const COLUMNS = ['Recebido', 'Preparando', 'Pronto'];
+const NEXT = {
+  Recebido: { status: 'Preparando', label: 'Iniciar preparo' },
+  Preparando: { status: 'Pronto', label: 'Marcar como pronto' },
+  Pronto: { status: 'Entregue', label: 'Entregar' }
+};
+
+const els = {
+  liveStatus: document.querySelector('#live-status'),
+  liveLabel: document.querySelector('#live-label'),
+  clock: document.querySelector('#clock'),
+  sound: document.querySelector('#sound-toggle'),
+  pinButton: document.querySelector('#pin-button'),
+  pinModal: document.querySelector('#pin-modal'),
+  pinForm: document.querySelector('#pin-form'),
+  pinInput: document.querySelector('#pin-input'),
+  pinError: document.querySelector('#pin-error'),
+  board: document.querySelector('.kitchen-board')
+};
+
+let orders = [];
+let knownIds = null;
+let soundOn = storage.get('pastifico-sound') === '1';
+let pin = storage.get('pastifico-kitchen-pin');
+let pendingAction = null;
+
+// ---------- som de novo pedido (Web Audio, sem arquivos) ----------
+function chime() {
+  if (!soundOn) return;
   try {
-    const response = await fetch('/orders/kitchen');
-    if (!response.ok) {
-      throw new Error('Erro ao carregar pedidos da cozinha');
-    }
-
-    kitchenOrders = await response.json();
-    renderKitchenOrders();
-  } catch (error) {
-    newOrdersPanel.innerHTML = `<div class="kitchen-card"><h3>Não foi possível carregar a cozinha</h3><p>${error.message}</p></div>`;
-    readyOrdersPanel.innerHTML = '';
-  }
-}
-
-function renderOrderCard(order) {
-  return `
-    <article class="kitchen-card">
-      <span class="order-status-badge">${order.status}</span>
-      <h3>Pedido ${order.id.slice(0, 8)}</h3>
-      <p><strong>Cliente:</strong> ${order.customerName}</p>
-      <p><strong>Mesa:</strong> ${order.tableNumber}</p>
-      <p><strong>Pagamento:</strong> ${order.paymentMethod || 'Não informado'} · ${order.paymentStatus || 'Aguardando'}</p>
-      <p><strong>Total:</strong> ${formatCurrency(order.total)}</p>
-      <ul class="kitchen-items">
-        ${order.items
-          .map(
-            (item) => `
-              <li>
-                <span>${item.quantity}x ${item.name}${item.options?.length ? ` <small>(${item.options.join(', ')})</small>` : ''}</span>
-                <strong>${formatCurrency(item.subtotal)}</strong>
-              </li>
-            `
-          )
-          .join('')}
-      </ul>
-      <div class="status-actions">
-        ${renderStatusActions(order)}
-      </div>
-    </article>
-  `;
-}
-
-function attachStatusListeners(container) {
-  container.querySelectorAll('[data-status]').forEach((button) => {
-    button.addEventListener('click', async () => {
-      const orderId = button.dataset.orderId;
-      const nextStatus = button.dataset.status;
-
-      await fetch(`/orders/${orderId}/status`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: nextStatus })
-      });
-
-      await loadKitchenOrders();
+    const context = new (window.AudioContext || window.webkitAudioContext)();
+    [880, 1320].forEach((frequency, index) => {
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      oscillator.frequency.value = frequency;
+      oscillator.type = 'sine';
+      gain.gain.setValueAtTime(0.0001, context.currentTime + index * 0.18);
+      gain.gain.exponentialRampToValueAtTime(0.25, context.currentTime + index * 0.18 + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + index * 0.18 + 0.35);
+      oscillator.connect(gain).connect(context.destination);
+      oscillator.start(context.currentTime + index * 0.18);
+      oscillator.stop(context.currentTime + index * 0.18 + 0.4);
     });
+  } catch { /* áudio indisponível */ }
+}
+
+function renderSoundButton() {
+  els.sound.textContent = soundOn ? '🔔 Som' : '🔕 Som';
+  els.sound.setAttribute('aria-pressed', String(soundOn));
+}
+
+function renderPinButton() {
+  if (!window.Pastifico.requiresPin) { els.pinButton.hidden = true; return; }
+  els.pinButton.hidden = false;
+  els.pinButton.textContent = pin ? '🔓 Sair' : '🔒 Entrar';
+}
+
+// ---------- renderização ----------
+function card(order, isNew) {
+  const next = NEXT[order.status];
+  const minutes = Math.floor((Date.now() - new Date(order.createdAt).getTime()) / 60000);
+  const urgency = order.status !== 'Pronto' && minutes >= 20 ? 'late' : order.status !== 'Pronto' && minutes >= 12 ? 'warn' : '';
+  return `
+    <article class="ticket ${isNew ? 'ticket-new' : ''} ${urgency}" data-order-id="${escapeHtml(order.id)}">
+      <header class="ticket-top">
+        <div class="ticket-table"><small>Mesa</small><strong>${escapeHtml(order.tableNumber)}</strong></div>
+        <div class="ticket-meta">
+          <strong>${escapeHtml(order.customerName)}</strong>
+          <span>#${escapeHtml(order.id.slice(0, 6))} · <time data-created="${escapeHtml(order.createdAt)}">${timeAgo(order.createdAt)}</time></span>
+        </div>
+      </header>
+      <ul class="ticket-items">
+        ${order.items.map((item) => `
+          <li><b>${item.quantity}×</b> <span>${escapeHtml(item.name)}${item.options?.length ? `<small>${escapeHtml(item.options.join(' · '))}</small>` : ''}</span></li>`).join('')}
+      </ul>
+      <footer class="ticket-footer">
+        <span class="ticket-pay">${escapeHtml(order.paymentMethod)} · ${formatCurrency(order.total)}</span>
+        ${next ? `<button class="button ticket-action" type="button" data-id="${escapeHtml(order.id)}" data-next="${next.status}">${next.label}</button>` : ''}
+      </footer>
+    </article>`;
+}
+
+function render() {
+  const newIds = knownIds ? orders.filter((order) => !knownIds.has(order.id)).map((order) => order.id) : [];
+  if (newIds.length && orders.some((order) => newIds.includes(order.id) && order.status === 'Recebido')) {
+    chime();
+    toast(newIds.length === 1 ? 'Novo pedido chegou!' : `${newIds.length} novos pedidos!`, 'success');
+  }
+  knownIds = new Set(orders.map((order) => order.id));
+
+  COLUMNS.forEach((status) => {
+    const list = els.board.querySelector(`[data-list="${status}"]`);
+    const items = orders.filter((order) => order.status === status);
+    els.board.querySelector(`[data-count="${status}"]`).textContent = String(items.length);
+    list.innerHTML = items.length
+      ? items.map((order) => card(order, newIds.includes(order.id))).join('')
+      : `<p class="kitchen-empty">${status === 'Recebido' ? 'Sem pedidos novos — cozinha tranquila.' : status === 'Preparando' ? 'Nada no fogo agora.' : 'Nenhum pedido aguardando retirada.'}</p>`;
   });
 }
 
-function renderKitchenOrders() {
-  const newOrders = kitchenOrders.filter((order) => order.status !== 'Pronto');
-  const readyOrders = kitchenOrders.filter((order) => order.status === 'Pronto');
-
-  newOrdersCount.textContent = String(newOrders.length);
-  readyOrdersCount.textContent = String(readyOrders.length);
-
-  newOrdersPanel.innerHTML = newOrders.length
-    ? newOrders.map(renderOrderCard).join('')
-    : '<div class="kitchen-empty"><strong>Nenhum pedido novo</strong><br />A cozinha está liberada no momento.</div>';
-
-  readyOrdersPanel.innerHTML = readyOrders.length
-    ? readyOrders.map(renderOrderCard).join('')
-    : '<div class="kitchen-empty"><strong>Nenhum pedido pronto</strong><br />Os pedidos prontos aparecerão aqui.</div>';
-
-  attachStatusListeners(newOrdersPanel);
-  attachStatusListeners(readyOrdersPanel);
+async function load() {
+  try {
+    orders = await window.Pastifico.listOrders({ openOnly: true });
+    orders.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    render();
+  } catch (error) {
+    setLive('offline');
+    toast(error.message, 'error');
+  }
 }
 
-function formatCurrency(value) {
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL'
-  }).format(value);
+function setLive(state) {
+  const labels = { live: 'Ao vivo', polling: 'Atualizando', connecting: 'Conectando…', offline: 'Sem conexão' };
+  els.liveStatus.dataset.state = state;
+  els.liveLabel.textContent = labels[state] || state;
 }
 
-function renderStatusActions(order) {
-  const nextStatus = {
-    Recebido: { label: 'Iniciar preparo', status: 'Preparando', className: 'secondary' },
-    Preparando: { label: 'Marcar como pronto', status: 'Pronto', className: 'primary' },
-    Pronto: { label: 'Entregar pedido', status: 'Entregue', className: 'primary' }
-  }[order.status];
-
-  if (!nextStatus) return '<p class="order-complete">Pedido entregue</p>';
-
-  return `<button class="status-button ${nextStatus.className}" data-order-id="${order.id}" data-status="${nextStatus.status}">${nextStatus.label}</button>`;
+// ---------- ações ----------
+async function advance(id, nextStatus, button) {
+  if (window.Pastifico.requiresPin && !pin) {
+    pendingAction = { id, nextStatus };
+    openPin();
+    return;
+  }
+  button?.classList.add('loading');
+  if (button) button.disabled = true;
+  try {
+    await window.Pastifico.updateOrderStatus(id, nextStatus, pin);
+    const order = orders.find((item) => item.id === id);
+    if (order) order.status = nextStatus;
+    orders = orders.filter((item) => item.status !== 'Entregue');
+    render();
+    if (nextStatus === 'Entregue') toast('Pedido entregue. Buon appetito!', 'success');
+  } catch (error) {
+    if (/PIN/i.test(error.message)) {
+      pin = null;
+      storage.remove('pastifico-kitchen-pin');
+      renderPinButton();
+      pendingAction = { id, nextStatus };
+      openPin('PIN inválido. Tente novamente.');
+    } else {
+      toast(error.message, 'error');
+    }
+    if (button) { button.disabled = false; button.classList.remove('loading'); }
+  }
 }
 
-loadKitchenOrders();
-window.setInterval(loadKitchenOrders, 5000);
+function openPin(message = '') {
+  els.pinError.textContent = message;
+  els.pinInput.value = '';
+  els.pinModal.hidden = false;
+  requestAnimationFrame(() => els.pinModal.classList.add('open'));
+  setTimeout(() => els.pinInput.focus(), 50);
+}
+
+function closePin() {
+  els.pinModal.classList.remove('open');
+  setTimeout(() => { els.pinModal.hidden = true; }, 220);
+}
+
+els.pinForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const candidate = els.pinInput.value.trim();
+  if (!candidate) return;
+  try {
+    if (!(await window.Pastifico.checkKitchenPin(candidate))) {
+      els.pinError.textContent = 'PIN incorreto.';
+      els.pinInput.select();
+      return;
+    }
+    pin = candidate;
+    storage.set('pastifico-kitchen-pin', pin);
+    renderPinButton();
+    closePin();
+    toast('Acesso liberado para a equipe.', 'success');
+    if (pendingAction) {
+      const { id, nextStatus } = pendingAction;
+      pendingAction = null;
+      advance(id, nextStatus);
+    }
+  } catch (error) {
+    els.pinError.textContent = error.message;
+  }
+});
+
+document.querySelector('#pin-close').addEventListener('click', () => { pendingAction = null; closePin(); });
+els.pinModal.addEventListener('click', (event) => { if (event.target === els.pinModal) { pendingAction = null; closePin(); } });
+document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !els.pinModal.hidden) closePin(); });
+
+els.pinButton.addEventListener('click', () => {
+  if (pin) {
+    pin = null;
+    storage.remove('pastifico-kitchen-pin');
+    renderPinButton();
+    toast('Sessão da equipe encerrada.');
+  } else {
+    openPin();
+  }
+});
+
+els.board.addEventListener('click', (event) => {
+  const button = event.target.closest('button[data-next]');
+  if (button) advance(button.dataset.id, button.dataset.next, button);
+});
+
+els.sound.addEventListener('click', () => {
+  soundOn = !soundOn;
+  storage.set('pastifico-sound', soundOn ? '1' : '0');
+  renderSoundButton();
+  if (soundOn) chime();
+});
+
+// ---------- relógio e tempos ----------
+function tick() {
+  els.clock.textContent = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  document.querySelectorAll('time[data-created]').forEach((element) => {
+    element.textContent = timeAgo(element.dataset.created);
+  });
+}
+
+// ---------- início ----------
+renderSoundButton();
+tick();
+setInterval(tick, 30000);
+
+window.Pastifico.ready
+  .then(() => {
+    renderPinButton();
+    load();
+    window.Pastifico.subscribeOrders(load, setLive);
+  })
+  .catch((error) => {
+    setLive('offline');
+    toast(error.message, 'error');
+  });

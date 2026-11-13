@@ -1,67 +1,49 @@
-const historyPanel = document.querySelector('#history-panel');
+const { escapeHtml, formatCurrency } = window.Pastifico;
 
-function formatCurrency(value) {
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL'
-  }).format(value);
+const panel = document.querySelector('#history-panel');
+const filters = document.querySelector('#filters');
+let orders = [];
+let filter = 'all';
+
+function render() {
+  const list = orders.filter((order) => filter === 'all' || order.status === filter);
+  if (!list.length) {
+    panel.innerHTML = '<div class="empty-state"><span aria-hidden="true">📭</span><p>Nenhum pedido por aqui.</p></div>';
+    return;
+  }
+
+  panel.innerHTML = list.map((order, index) => `
+    <article class="history-card reveal in-view" style="--i:${index % 9}">
+      <header>
+        <div>
+          <strong>Mesa ${escapeHtml(order.tableNumber)} · ${escapeHtml(order.customerName)}</strong>
+          <small>#${escapeHtml(order.id.slice(0, 6))} · ${new Date(order.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</small>
+        </div>
+        <span class="status-badge status-${escapeHtml(order.status.toLowerCase())}">${escapeHtml(order.status)}</span>
+      </header>
+      <ul>
+        ${order.items.map((item) => `<li><span>${item.quantity}× ${escapeHtml(item.name)}</span><span>${formatCurrency(item.subtotal)}</span></li>`).join('')}
+      </ul>
+      <footer><span>${escapeHtml(order.paymentMethod)}</span><strong>${formatCurrency(order.total)}</strong></footer>
+    </article>`).join('');
 }
 
-async function loadOrderHistory() {
+async function load() {
   try {
-    const response = await fetch('/orders');
-    if (!response.ok) {
-      throw new Error('Erro ao carregar histórico');
-    }
-
-    const orders = await response.json();
-
-    if (!orders.length) {
-      historyPanel.innerHTML = '<div class="empty-history">Nenhum pedido registrado ainda.</div>';
-      return;
-    }
-
-    historyPanel.innerHTML = orders
-      .slice()
-      .reverse()
-      .map(
-        (order) => `
-          <article class="history-order">
-            <div class="history-order-top">
-              <h3>Pedido ${order.id.slice(0, 8)}</h3>
-              <span class="status-pill">${order.status}</span>
-            </div>
-
-            <div class="history-meta">
-              <span><strong>Cliente:</strong> ${order.customerName}</span>
-              <span><strong>Mesa:</strong> ${order.tableNumber}</span>
-              <span><strong>Data:</strong> ${new Date(order.createdAt).toLocaleString('pt-BR')}</span>
-            </div>
-
-            <ul class="history-items">
-              ${order.items
-                .map(
-                  (item) => `
-                    <li>
-                      <span>${item.quantity}x ${item.name}${item.options?.length ? ` <small>(${item.options.join(', ')})</small>` : ''}</span>
-                      <strong>${formatCurrency(item.subtotal)}</strong>
-                    </li>
-                  `
-                )
-                .join('')}
-            </ul>
-
-            <div class="history-total">
-              <span>Total</span>
-              <span>${formatCurrency(order.total)}</span>
-            </div>
-          </article>
-        `
-      )
-      .join('');
+    orders = (await window.Pastifico.listOrders({ limit: 100 })).reverse();
+    render();
   } catch (error) {
-    historyPanel.innerHTML = `<div class="empty-history">${error.message}</div>`;
+    panel.innerHTML = `<div class="empty-state"><span aria-hidden="true">⚠️</span><p>${escapeHtml(error.message)}</p></div>`;
   }
 }
 
-loadOrderHistory();
+filters.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-filter]');
+  if (!button) return;
+  filter = button.dataset.filter;
+  filters.querySelectorAll('.chip').forEach((chip) => chip.classList.toggle('active', chip === button));
+  render();
+});
+
+load();
+window.Pastifico.subscribeOrders(load);

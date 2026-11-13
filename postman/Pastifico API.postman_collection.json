@@ -2,15 +2,38 @@
   "info": {
     "_postman_id": "c2c1e6fd-7c62-4be9-84d3-f4bdff664180",
     "name": "Pastifico API",
-    "description": "Requisições para o autoatendimento, catálogo, cozinha e acompanhamento de pedidos do Pastifico. Os ids são UUID e são capturados automaticamente nas variáveis da coleção pelos scripts de teste de cada requisição de criação.",
+    "description": "Requisições da Pastifico API (autor: Leonardo Hamilton Moreira de Camargo). Pode ser executada inteira pelo Collection Runner, na ordem das pastas: cada requisição tem testes automáticos (pm.test). Os ids reais do cardápio ficam em categoryId/productId; os registros criados pela coleção usam createdCategoryId/createdProductId e são removidos ao final, sem alterar o cardápio real. Documentação OpenAPI em {{baseUrl}}/api-docs.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "baseUrl", "value": "http://localhost:3000" },
-    { "key": "categoryId", "value": "" },
-    { "key": "productId", "value": "" },
-    { "key": "orderId", "value": "" },
-    { "key": "tableNumber", "value": "5" }
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "categoryId",
+      "value": ""
+    },
+    {
+      "key": "productId",
+      "value": ""
+    },
+    {
+      "key": "createdCategoryId",
+      "value": ""
+    },
+    {
+      "key": "createdProductId",
+      "value": ""
+    },
+    {
+      "key": "orderId",
+      "value": ""
+    },
+    {
+      "key": "tableNumber",
+      "value": "5"
+    }
   ],
   "item": [
     {
@@ -18,7 +41,60 @@
       "item": [
         {
           "name": "Health check",
-          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/health" }
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "health"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Resposta em JSON', () => pm.response.to.be.json);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Especificação OpenAPI",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api-docs/openapi.json",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api-docs",
+                "openapi.json"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -27,41 +103,278 @@
       "item": [
         {
           "name": "Listar categorias",
-          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/categories" },
-          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["if (pm.response.code === 200) {", "  const categories = pm.response.json();", "  if (Array.isArray(categories) && categories.length) {", "    const id = categories[0].id;", "    pm.collectionVariables.set('categoryId', id);", "    if (pm.environment.get('categoryId') !== undefined && pm.environment.get('categoryId') !== null) {", "      pm.environment.set('categoryId', id);", "    }", "  }", "}"] } }]
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "categories"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const categories = pm.response.json();",
+                  "pm.test('Retorna uma lista', () => pm.expect(categories).to.be.an('array'));",
+                  "if (categories.length) pm.collectionVariables.set('categoryId', categories[0].id);"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Buscar categoria por ID",
-          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/categories/{{categoryId}}" }
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/categories/{{categoryId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "categories",
+                "{{categoryId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Criar categoria",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Especiais da casa\",\n  \"description\": \"Pratos especiais do Pastifico\"\n}", "options": { "raw": { "language": "json" } } },
-            "url": "{{baseUrl}}/categories",
-            "description": "A resposta inclui o ID (uuid); o script de teste salva automaticamente em categoryId."
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "categories"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Especiais da casa {{$timestamp}}\",\n  \"description\": \"Pratos especiais do Pastifico\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Cria uma categoria de teste (nome único com timestamp) e guarda o id em createdCategoryId."
           },
-          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["if (pm.response.code === 201) {", "  const category = pm.response.json();", "  if (category.id) {", "    pm.collectionVariables.set('categoryId', category.id);", "    if (pm.environment.get('categoryId') !== undefined && pm.environment.get('categoryId') !== null) {", "      pm.environment.set('categoryId', category.id);", "    }", "  }", "}"] } }]
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "const category = pm.response.json();",
+                  "pm.test('Retorna id UUID', () => pm.expect(category.id).to.match(/^[0-9a-f-]{36}$/i));",
+                  "pm.collectionVariables.set('createdCategoryId', category.id);"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Atualizar categoria",
           "request": {
             "method": "PUT",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"description\": \"Descrição atualizada via Postman\"\n}", "options": { "raw": { "language": "json" } } },
-            "url": "{{baseUrl}}/categories/{{categoryId}}"
-          }
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/categories/{{createdCategoryId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "categories",
+                "{{createdCategoryId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Descrição atualizada via Postman\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Descrição atualizada', () => pm.expect(pm.response.json().description).to.eql('Descrição atualizada via Postman'));"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Remover categoria",
           "request": {
             "method": "DELETE",
             "header": [],
-            "url": "{{baseUrl}}/categories/{{categoryId}}",
-            "description": "Para receber 204, use uma categoria sem produtos associados (por exemplo, rode 'Criar categoria' imediatamente antes). Categorias com produtos retornam 409."
-          }
+            "url": {
+              "raw": "{{baseUrl}}/categories/{{createdCategoryId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "categories",
+                "{{createdCategoryId}}"
+              ]
+            },
+            "description": "Remove apenas a categoria criada pela coleção, nunca uma categoria real do cardápio."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Erro - categoria inexistente (404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/categories/00000000-0000-4000-8000-000000000000",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "categories",
+                "00000000-0000-4000-8000-000000000000"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));",
+                  "pm.test('Mensagem de erro em JSON', () => pm.expect(pm.response.json()).to.have.property('message'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Erro - id inválido (400)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/categories/abc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "categories",
+                "abc"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Mensagem de erro em JSON', () => pm.expect(pm.response.json()).to.have.property('message'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Erro - campos obrigatórios (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "categories"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Sem descrição\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Mensagem de erro em JSON', () => pm.expect(pm.response.json()).to.have.property('message'));"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -70,41 +383,249 @@
       "item": [
         {
           "name": "Listar produtos",
-          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/products" },
-          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["if (pm.response.code === 200) {", "  const products = pm.response.json();", "  if (Array.isArray(products) && products.length) {", "    const id = products[0].id;", "    pm.collectionVariables.set('productId', id);", "    if (pm.environment.get('productId') !== undefined && pm.environment.get('productId') !== null) {", "      pm.environment.set('productId', id);", "    }", "  }", "}"] } }]
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const products = pm.response.json();",
+                  "pm.test('Retorna uma lista', () => pm.expect(products).to.be.an('array'));",
+                  "// Usa um prato principal para os pedidos (aceita o adicional 'Parmesão ralado na hora').",
+                  "const dish = products.find((p) => p.name === 'Spaghetti Carbonara') || products[0];",
+                  "if (dish) pm.collectionVariables.set('productId', dish.id);"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Buscar produto por ID",
-          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/products/{{productId}}" }
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/{{productId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "{{productId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Criar produto",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Ravioli de teste\",\n  \"description\": \"Ravioli artesanal para testar a API\",\n  \"price\": 39.90,\n  \"image\": \"https://example.com/ravioli.jpg\",\n  \"isAvailable\": true,\n  \"categoryId\": \"{{categoryId}}\"\n}", "options": { "raw": { "language": "json" } } },
-            "url": "{{baseUrl}}/products",
-            "description": "Rode antes 'Listar categorias' (ou 'Criar categoria') para preencher {{categoryId}}. A resposta inclui o ID; o script de teste salva automaticamente em productId."
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Ravioli de teste {{$timestamp}}\",\n  \"description\": \"Ravioli artesanal para testar a API\",\n  \"price\": 39.9,\n  \"image\": \"https://example.com/ravioli.jpg\",\n  \"isAvailable\": true,\n  \"categoryId\": \"{{categoryId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Cria um produto de teste na primeira categoria listada e guarda o id em createdProductId."
           },
-          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["if (pm.response.code === 201) {", "  const product = pm.response.json();", "  if (product.id) {", "    pm.collectionVariables.set('productId', product.id);", "    if (pm.environment.get('productId') !== undefined && pm.environment.get('productId') !== null) {", "      pm.environment.set('productId', product.id);", "    }", "  }", "}"] } }]
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('createdProductId', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Atualizar produto",
           "request": {
             "method": "PUT",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"price\": 42.50,\n  \"isAvailable\": true\n}", "options": { "raw": { "language": "json" } } },
-            "url": "{{baseUrl}}/products/{{productId}}"
-          }
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/products/{{createdProductId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "{{createdProductId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"price\": 42.5,\n  \"isAvailable\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Atualiza somente o produto de teste. Campos aceitos: name, description, price, image, isAvailable, categoryId."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Preço atualizado', () => pm.expect(pm.response.json().price).to.eql(42.5));"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Remover produto",
           "request": {
             "method": "DELETE",
             "header": [],
-            "url": "{{baseUrl}}/products/{{productId}}",
-            "description": "Para receber 204, use um produto sem pedidos associados (por exemplo, rode 'Criar produto' e não o inclua em pedidos). Produtos presentes no histórico retornam 409."
-          }
+            "url": {
+              "raw": "{{baseUrl}}/products/{{createdProductId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "{{createdProductId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Erro - produto inexistente (404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/00000000-0000-4000-8000-000000000000",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "00000000-0000-4000-8000-000000000000"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));",
+                  "pm.test('Mensagem de erro em JSON', () => pm.expect(pm.response.json()).to.have.property('message'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Erro - preço inválido (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Inválido\",\n  \"description\": \"x\",\n  \"price\": -10,\n  \"image\": \"/x.jpg\",\n  \"categoryId\": \"{{categoryId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Mensagem de erro em JSON', () => pm.expect(pm.response.json()).to.have.property('message'));"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -112,36 +633,303 @@
       "name": "Pedidos",
       "item": [
         {
-          "name": "Listar pedidos",
-          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/orders" }
-        },
-        {
-          "name": "Buscar pedido por ID",
-          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/orders/{{orderId}}" }
-        },
-        {
           "name": "Criar pedido de exemplo",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"customerName\": \"Cliente Postman\",\n  \"tableNumber\": 5,\n  \"paymentMethod\": \"PIX\",\n  \"items\": [\n    {\n      \"productId\": \"{{productId}}\",\n      \"quantity\": 1,\n      \"options\": [\"Parmesão ralado na hora\"]\n    }\n  ]\n}", "options": { "raw": { "language": "json" } } },
-            "url": "{{baseUrl}}/orders",
-            "description": "Rode antes 'Listar produtos' (ou 'Criar produto') para preencher {{productId}}."
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerName\": \"Cliente Postman\",\n  \"tableNumber\": 5,\n  \"paymentMethod\": \"PIX\",\n  \"items\": [\n    {\n      \"productId\": \"{{productId}}\",\n      \"quantity\": 1,\n      \"options\": [\n        \"Parmesão ralado na hora\"\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
           },
-          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["if (pm.response.code === 201) {", "  const order = pm.response.json();", "  if (order.id) {", "    pm.collectionVariables.set('orderId', order.id);", "    if (pm.environment.get('orderId') !== undefined && pm.environment.get('orderId') !== null) {", "      pm.environment.set('orderId', order.id);", "    }", "  }", "}"] } }]
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "const order = pm.response.json();",
+                  "pm.test('Status inicial Recebido', () => pm.expect(order.status).to.eql('Recebido'));",
+                  "pm.collectionVariables.set('orderId', order.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar pedidos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Buscar pedido por ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/orders/{{orderId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders",
+                "{{orderId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Atualizar status do pedido",
           "request": {
             "method": "PATCH",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"status\": \"Preparando\"\n}", "options": { "raw": { "language": "json" } } },
-            "url": "{{baseUrl}}/orders/{{orderId}}/status"
-          }
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/orders/{{orderId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders",
+                "{{orderId}}",
+                "status"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"Preparando\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Status atualizado', () => pm.expect(pm.response.json().status).to.eql('Preparando'));"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Remover pedido",
-          "request": { "method": "DELETE", "header": [], "url": "{{baseUrl}}/orders/{{orderId}}" }
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/orders/{{orderId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders",
+                "{{orderId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Erro - JSON malformado (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"customerName\": \"Ana\", ",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Mensagem de erro em JSON', () => pm.expect(pm.response.json()).to.have.property('message'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Erro - adicional inválido (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerName\": \"Ana\",\n  \"tableNumber\": 2,\n  \"items\": [\n    {\n      \"productId\": \"{{productId}}\",\n      \"quantity\": 1,\n      \"options\": [\n        \"Taça de vinho\"\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Mensagem de erro em JSON', () => pm.expect(pm.response.json()).to.have.property('message'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Erro - status inválido (400)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/orders/{{orderId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders",
+                "{{orderId}}",
+                "status"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"Cancelado\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Mensagem de erro em JSON', () => pm.expect(pm.response.json()).to.have.property('message'));"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -150,11 +938,90 @@
       "item": [
         {
           "name": "Listar pedidos em aberto",
-          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/orders/kitchen" }
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/orders/kitchen",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders",
+                "kitchen"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Listar pedidos da mesa",
-          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/orders/table/{{tableNumber}}" }
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/orders/table/{{tableNumber}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders",
+                "table",
+                "{{tableNumber}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Erro - mesa inválida (400)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/orders/table/abc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders",
+                "table",
+                "abc"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Mensagem de erro em JSON', () => pm.expect(pm.response.json()).to.have.property('message'));"
+                ]
+              }
+            }
+          ]
         }
       ]
     }

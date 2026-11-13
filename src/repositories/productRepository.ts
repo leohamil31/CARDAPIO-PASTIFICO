@@ -3,9 +3,27 @@ import { Product } from '../models/Product';
 import { isSupabaseConfigured, requireSupabaseClient } from '../config/supabaseClient';
 import { ensureDatabaseFile, saveDatabase } from '../config/localDatabase';
 import { isValidUuid } from '../utils/uuid';
+import { escapeLikePattern } from '../utils/text';
 import { HttpError } from '../middlewares/errorHandler';
 
-const mapProduct = (row: any): Product => ({
+export type ProductInput = Omit<Product, 'id' | 'createdAt'>;
+export type ProductChanges = Partial<ProductInput>;
+
+interface ProductRow {
+  id: string;
+  name: string;
+  description: string;
+  price: number | string;
+  image: string;
+  is_available: boolean;
+  category_id: string;
+  created_at: string;
+}
+
+const IN_USE_MESSAGE = 'Não é possível remover: o produto já aparece em pedidos. Marque-o como indisponível (isAvailable: false).';
+const DUPLICATE_MESSAGE = 'Já existe um produto com esse nome.';
+
+const mapProduct = (row: ProductRow): Product => ({
   id: row.id,
   name: row.name,
   description: row.description,
@@ -43,21 +61,14 @@ export const productRepository = {
     return findAllLocal().find((product) => product.id === id);
   },
 
-  async create(input: {
-    name: string;
-    description: string;
-    price: number;
-    image: string;
-    isAvailable: boolean;
-    categoryId: string;
-  }): Promise<Product> {
+  async create(input: ProductInput): Promise<Product> {
     const name = input.name.trim();
 
     if (isSupabaseConfigured()) {
       const supabase = requireSupabaseClient();
-      const { data: existing, error: existingError } = await supabase.from('products').select('*').ilike('name', name).maybeSingle();
+      const { data: existing, error: existingError } = await supabase.from('products').select('id').ilike('name', escapeLikePattern(name)).limit(1);
       if (existingError) throw existingError;
-      if (existing) return mapProduct(existing);
+      if (existing && existing.length > 0) throw new HttpError(409, DUPLICATE_MESSAGE);
 
       const { data, error } = await supabase.from('products').insert({
         id: randomUUID(),
@@ -74,7 +85,7 @@ export const productRepository = {
 
     const products = findAllLocal();
     const existingProduct = products.find((product) => product.name.toLowerCase() === name.toLowerCase());
-    if (existingProduct) return existingProduct;
+    if (existingProduct) throw new HttpError(409, DUPLICATE_MESSAGE);
 
     const product: Product = {
       id: randomUUID(),
@@ -92,7 +103,7 @@ export const productRepository = {
     return product;
   },
 
-  async update(id: string, changes: Partial<Omit<Product, 'id' | 'createdAt'>>): Promise<Product | undefined> {
+  async update(id: string, changes: ProductChanges): Promise<Product | undefined> {
     if (isSupabaseConfigured()) {
       if (!isValidUuid(id)) return undefined;
       const payload: Record<string, unknown> = { ...changes };
@@ -113,6 +124,13 @@ export const productRepository = {
     const product = products.find((current) => current.id === id);
     if (!product) return undefined;
 
+    if (changes.name !== undefined) {
+      const newName = changes.name.toLowerCase();
+      if (products.some((current) => current.id !== id && current.name.toLowerCase() === newName)) {
+        throw new HttpError(409, DUPLICATE_MESSAGE);
+      }
+    }
+
     Object.assign(product, changes);
     persistLocal(products);
     return product;
@@ -122,18 +140,20 @@ export const productRepository = {
     if (isSupabaseConfigured()) {
       if (!isValidUuid(id)) return false;
       const { error, count } = await requireSupabaseClient().from('products').delete({ count: 'exact' }).eq('id', id);
-      if (error?.code === '23503') {
-        throw new HttpError(409, 'Não é possível remover o produto porque ele está associado a pedidos.');
-      }
+      // 23503 = violação de chave estrangeira (order_items.product_id → products.id).
+      if (error?.code === '23503') throw new HttpError(409, IN_USE_MESSAGE);
       if (error) throw error;
       return Boolean(count);
     }
 
-    const products = findAllLocal();
+    const db = ensureDatabaseFile();
+    const products = db.products;
     const index = products.findIndex((product) => product.id === id);
     if (index === -1) return false;
-    if (ensureDatabaseFile().orders.some((order) => order.items.some((item) => item.productId === id))) {
-      throw new HttpError(409, 'Não é possível remover o produto porque ele está associado a pedidos.');
+
+    // Mantém o mesmo comportamento da chave estrangeira do PostgreSQL no modo local.
+    if (db.orders.some((order) => order.items.some((item) => item.productId === id))) {
+      throw new HttpError(409, IN_USE_MESSAGE);
     }
 
     products.splice(index, 1);

@@ -11,7 +11,12 @@ export interface PersistedDatabase {
   orders: Order[];
 }
 
-const dbPath = path.join(process.cwd(), 'data', 'pastifico-db.json');
+/**
+ * Caminho do "banco" local. Pode ser trocado pela variável PASTIFICO_DB_PATH
+ * (os testes automatizados usam um arquivo temporário para não alterar
+ * `data/pastifico-db.json`). Lido a cada chamada para respeitar mudanças.
+ */
+const getDbPath = (): string => process.env.PASTIFICO_DB_PATH || path.join(process.cwd(), 'data', 'pastifico-db.json');
 
 /**
  * Conteúdo de exemplo (seed) usado apenas quando o arquivo local ainda não existe.
@@ -52,7 +57,7 @@ const productSeeds = [
   { name: 'Cannoli', description: 'Casca crocante recheada com ricota e chocolate.', price: 18.5, image: 'https://images.unsplash.com/photo-1563729784474-d77dbb933a9e?auto=format&fit=crop&w=900&q=80', categoryKey: 'sobremesas' },
   { name: 'Pavê de Chocolate', description: 'Camadas cremosa de chocolate com biscoitos e cacau.', price: 23.5, image: '/images/pave-chocolate-real.png', categoryKey: 'sobremesas' },
   { name: 'Torta de Ricota', description: 'Sobremesa clássica com massa fina e recheio de ricota.', price: 24.9, image: 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?auto=format&fit=crop&w=900&q=80', categoryKey: 'sobremesas' },
-  { name: 'Affogato', description: 'Sorvete de baunilha com café espresso quentinho.', price: 18.9, image: 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=900&q=80', categoryKey: 'sobremesas' }
+  { name: 'Affogato', description: 'Sorvete de baunilha com café espresso quentinho.', price: 19.9, image: 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=900&q=80', categoryKey: 'sobremesas' }
 ];
 
 const buildDefaultDatabase = (): PersistedDatabase => {
@@ -119,17 +124,9 @@ const sanitizeCatalogData = (database: PersistedDatabase, defaultDatabase: Persi
     }
   }
 
-  for (const category of defaultDatabase.categories) {
-    if (!uniqueCategories.has(category.name.toLowerCase())) {
-      uniqueCategories.set(category.name.toLowerCase(), category);
-    }
-  }
-
-  for (const product of defaultDatabase.products) {
-    if (!uniqueProducts.has(product.name.toLowerCase())) {
-      uniqueProducts.set(product.name.toLowerCase(), product);
-    }
-  }
+  // Observação: o seed só é usado quando o arquivo não existe ou está vazio/corrompido.
+  // Não recriamos aqui itens do seed que foram removidos via API; antes isso fazia
+  // um produto/categoria apagado "ressuscitar" com um novo id (e categoryId órfão).
 
   return {
     categories: Array.from(uniqueCategories.values()),
@@ -139,6 +136,7 @@ const sanitizeCatalogData = (database: PersistedDatabase, defaultDatabase: Persi
 };
 
 export const ensureDatabaseFile = (): PersistedDatabase => {
+  const dbPath = getDbPath();
   const directory = path.dirname(dbPath);
 
   if (!fs.existsSync(directory)) {
@@ -176,5 +174,5 @@ export const ensureDatabaseFile = (): PersistedDatabase => {
 };
 
 export const saveDatabase = (database: PersistedDatabase): void => {
-  fs.writeFileSync(dbPath, JSON.stringify(database, null, 2), 'utf8');
+  fs.writeFileSync(getDbPath(), JSON.stringify(database, null, 2), 'utf8');
 };
