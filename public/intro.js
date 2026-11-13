@@ -1,8 +1,7 @@
 /**
  * Tela de boas-vindas + animação de abertura do cardápio.
- * 1) Apresentação (título, fotos e destaques) com o botão "Fazer pedido";
- *    os números "embaralham" até o valor final.
- * 2) Ao tocar: a apresentação some e aparece a marca com uma barra de
+ * 1) Tela escura de boas-vindas com o logotipo e o botão "Fazer pedido".
+ * 2) Ao tocar: o texto some e o logotipo fica no centro com uma barra de
  *    carregamento nas cores da Itália.
  * 3) Um círculo se abre do centro revelando o cardápio, que sai do desfoque.
  *
@@ -34,28 +33,8 @@
   behind.forEach((element) => element.setAttribute('inert', ''));
   const cta = intro.querySelector('.intro-cta');
   requestAnimationFrame(() => cta.focus({ preventScroll: true }));
-  if (!reducedMotion) setTimeout(() => intro.querySelectorAll('[data-scramble]').forEach((element) => scramble(element)), 700);
 
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-  /** Embaralha os dígitos até chegar ao texto final (efeito do vídeo). */
-  function scramble(element, duration = 1200) {
-    const finalText = element.textContent;
-    const start = performance.now();
-    const step = (now) => {
-      const progress = Math.min(1, (now - start) / duration);
-      let digitIndex = 0;
-      const digits = finalText.replace(/\D/g, '').length || 1;
-      element.textContent = finalText.replace(/\d/g, (digit) => {
-        digitIndex += 1;
-        // Cada dígito "trava" no valor certo um pouco depois do anterior.
-        return progress >= digitIndex / (digits + 1) + 0.25 ? digit : String(Math.floor(Math.random() * 10));
-      });
-      if (progress < 1) requestAnimationFrame(step);
-      else element.textContent = finalText;
-    };
-    requestAnimationFrame(step);
-  }
 
   let started = false;
   async function start() {
@@ -80,5 +59,10 @@
     finish();
   }
 
-  cta.addEventListener('click', start);
+  cta.addEventListener('click', (event) => {
+    event.stopPropagation();
+    start();
+  });
+  // Totem: tocar em qualquer lugar da tela de boas-vindas também começa.
+  intro.addEventListener('click', start);
 })();
