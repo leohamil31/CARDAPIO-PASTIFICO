@@ -6,12 +6,12 @@ Sistema de autoatendimento para um restaurante italiano (Pastifico), com catálo
 
 ## Demonstração online (GitHub Pages)
 
-- **Cardápio:** https://leohamil31.github.io/cardapio-pastifico/
-- **Painel da cozinha (tempo real):** https://leohamil31.github.io/cardapio-pastifico/kitchen.html
-- **Acompanhar pedido:** https://leohamil31.github.io/cardapio-pastifico/order-status.html
-- **Histórico:** https://leohamil31.github.io/cardapio-pastifico/order-history.html
+- **Cardápio:** https://leohamil31.github.io/CARDAPIO-PASTIFICO/
+- **Painel da cozinha (tempo real):** https://leohamil31.github.io/CARDAPIO-PASTIFICO/kitchen.html
+- **Acompanhar pedido:** https://leohamil31.github.io/CARDAPIO-PASTIFICO/order-status.html
+- **Histórico:** https://leohamil31.github.io/CARDAPIO-PASTIFICO/order-history.html
 
-> Os links consideram o repositório renomeado para `cardapio-pastifico`. Enquanto o nome for `projeto-back-end-2026`, troque esse trecho da URL.
+> O repositório se chama `CARDAPIO-PASTIFICO`; o endereço antigo (`projeto-back-end-2026`) redireciona para ele.
 
 O GitHub Pages hospeda apenas arquivos estáticos, então a versão online não executa o servidor Node.js. A pasta `public/` detecta isso sozinha (`public/api.js`) e conversa **direto com o Supabase** usando a chave publicável (`public/config.js`). A segurança fica no banco ([`supabase/public-access.sql`](./supabase/public-access.sql)):
 
@@ -22,7 +22,7 @@ O GitHub Pages hospeda apenas arquivos estáticos, então a versão online não 
 
 Rodando localmente com `npm run dev`, o mesmo front-end usa a API REST do Express. Para forçar uma fonte, adicione `?fonte=api` ou `?fonte=supabase` à URL.
 
-O deploy é feito pelo workflow [`.github/workflows/pages.yml`](./.github/workflows/pages.yml) a cada push na `main`. Na primeira vez, ative em **Settings → Pages → Source: GitHub Actions**.
+O deploy é feito pelo workflow [`.github/workflows/pages.yml`](./.github/workflows/pages.yml): a cada push na `main` ele copia a pasta `public/` para a branch `gh-pages`. Configuração única: **Settings → Pages → Source: Deploy from a branch → `gh-pages` / (root)**.
 
 ## 1. Descrição do projeto
 
@@ -142,7 +142,7 @@ data/         # Banco de dados local em JSON (fallback quando o Supabase não es
 1. Clone o repositório:
 
    ```powershell
-   git clone https://github.com/leohamil31/cardapio-pastifico.git
+   git clone https://github.com/leohamil31/CARDAPIO-PASTIFICO.git
    cd cardapio-pastifico
    ```
 
