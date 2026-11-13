@@ -1,9 +1,10 @@
 /**
  * Tela de boas-vindas + animação de abertura do cardápio.
- * 1) Tela escura com a marca e o botão "Fazer pedido".
- * 2) Ao tocar: barra de carregamento nas cores da Itália.
- * 3) Um círculo se abre do centro revelando a página; o conteúdo sai do
- *    desfoque e os números "embaralham" até o valor final.
+ * 1) Apresentação (título, fotos e destaques) com o botão "Fazer pedido";
+ *    os números "embaralham" até o valor final.
+ * 2) Ao tocar: a apresentação some e aparece a marca com uma barra de
+ *    carregamento nas cores da Itália.
+ * 3) Um círculo se abre do centro revelando o cardápio, que sai do desfoque.
  *
  * Pula a abertura quando a URL tem #âncora (ex.: index.html#menu) ou ?semIntro.
  */
@@ -33,11 +34,12 @@
   behind.forEach((element) => element.setAttribute('inert', ''));
   const cta = intro.querySelector('.intro-cta');
   requestAnimationFrame(() => cta.focus({ preventScroll: true }));
+  if (!reducedMotion) setTimeout(() => intro.querySelectorAll('[data-scramble]').forEach((element) => scramble(element)), 700);
 
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
   /** Embaralha os dígitos até chegar ao texto final (efeito do vídeo). */
-  function scramble(element, duration = 1100) {
+  function scramble(element, duration = 1200) {
     const finalText = element.textContent;
     const start = performance.now();
     const step = (now) => {
@@ -74,22 +76,9 @@
 
     intro.classList.add('is-revealing');
     document.body.classList.add('intro-reveal');
-    await wait(450);
-    document.querySelectorAll('[data-scramble]').forEach((element) => scramble(element));
-    await wait(1150);
+    await wait(1500);
     finish();
   }
 
-  cta.addEventListener('click', (event) => {
-    event.stopPropagation();
-    start();
-  });
-  // Totem: tocar em qualquer lugar da tela de boas-vindas também começa.
-  intro.addEventListener('click', start);
-  intro.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      start();
-    }
-  });
+  cta.addEventListener('click', start);
 })();
