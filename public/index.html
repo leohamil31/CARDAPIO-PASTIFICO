@@ -13,6 +13,20 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body class="menu-page">
+    <div class="intro" id="intro" role="dialog" aria-modal="true" aria-labelledby="intro-title">
+      <div class="intro-center">
+        <span class="intro-mark" aria-hidden="true">P</span>
+        <p class="intro-word">Pastifico</p>
+        <span class="intro-loader" aria-hidden="true"><span></span></span>
+        <div class="intro-welcome">
+          <p class="intro-kicker">Benvenuti</p>
+          <p class="intro-title" id="intro-title">Massa fresca,<br /><em>feita na hora.</em></p>
+          <button class="button intro-cta" type="button">Fazer pedido</button>
+          <p class="intro-hint">ou toque em qualquer lugar da tela</p>
+        </div>
+      </div>
+    </div>
+
     <a class="skip-link" href="#menu">Pular para o cardápio</a>
 
     <header class="site-header">
@@ -27,8 +41,6 @@
         <nav class="site-nav" aria-label="Navegação principal">
           <a href="#menu">Cardápio</a>
           <a href="order-status.html">Meu pedido</a>
-          <a href="order-history.html">Histórico</a>
-          <a href="kitchen.html">Cozinha</a>
         </nav>
         <span class="open-pill"><span class="pulse-dot" aria-hidden="true"></span>Aberto agora</span>
       </div>
@@ -44,8 +56,8 @@
           <a class="button button-ghost" href="order-status.html">Acompanhar pedido</a>
         </div>
         <ul class="hero-facts" aria-label="Destaques">
-          <li><strong id="fact-items">27</strong><span>itens no menu</span></li>
-          <li><strong>~15 min</strong><span>tempo médio</span></li>
+          <li><strong id="fact-items" data-scramble>27</strong><span>itens no menu</span></li>
+          <li><strong data-scramble>~15 min</strong><span>tempo médio</span></li>
           <li><strong>PIX · Cartão</strong><span>ou dinheiro</span></li>
         </ul>
       </div>
@@ -175,5 +187,6 @@
     <script src="config.js"></script>
     <script src="api.js"></script>
     <script src="app.js"></script>
+    <script src="intro.js"></script>
   </body>
 </html>

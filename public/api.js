@@ -51,26 +51,6 @@
     createdAt: row.created_at
   });
 
-  const mapOrder = (row) => ({
-    id: row.id,
-    customerName: row.customer_name,
-    tableNumber: row.table_number,
-    status: row.status,
-    total: Number(row.total),
-    createdAt: row.created_at,
-    paymentMethod: row.payment_method || 'Dinheiro',
-    paymentStatus: row.payment_status === 'Pago' ? 'Pago' : 'Aguardando no caixa',
-    items: (row.order_items || []).map((item) => ({
-      id: item.id,
-      productId: item.product_id,
-      name: item.name,
-      quantity: item.quantity,
-      unitPrice: Number(item.unit_price),
-      subtotal: Number(item.subtotal),
-      options: item.options || []
-    }))
-  });
-
   const fixOrder = (order) => ({ ...order, total: Number(order.total), items: (order.items || []).map((item) => ({ ...item, unitPrice: Number(item.unitPrice), subtotal: Number(item.subtotal) })) });
 
   // ---------- detecção do modo ----------
@@ -158,18 +138,16 @@
   async function getOrder(id) {
     await ready;
     if (mode === 'api') return rest(`orders/${encodeURIComponent(id)}`);
-    const data = check(await sb().from('orders').select('*, order_items(*)').eq('id', id).maybeSingle());
-    if (!data) throw new Error('Pedido não encontrado.');
-    return mapOrder(data);
+    // O cliente só enxerga o próprio pedido, pelo id (as tabelas não são públicas).
+    return fixOrder(check(await sb().rpc('get_order', { p_order_id: id })));
   }
 
+  /** Lista de pedidos: só para a equipe (no Supabase exige o PIN da cozinha). */
   async function listOrders({ openOnly = false, limit = 200 } = {}) {
     await ready;
     if (mode === 'api') return rest(openOnly ? 'orders/kitchen' : 'orders');
-    let query = sb().from('orders').select('*, order_items(*)').order('created_at', { ascending: false }).limit(limit);
-    if (openOnly) query = query.neq('status', 'Entregue');
-    const rows = check(await query);
-    return rows.map(mapOrder).reverse();
+    const rows = check(await sb().rpc('list_orders', { p_pin: staffPin(), p_open_only: openOnly, p_limit: limit }));
+    return (rows || []).map(fixOrder);
   }
 
   async function updateOrderStatus(id, status, pin) {
@@ -190,7 +168,7 @@
    * API REST: verificação periódica.
    * Retorna uma função para cancelar e informa o estado da conexão por onStatus.
    */
-  function subscribeOrders(onChange, onStatus = () => {}) {
+  function subscribeOrders(onChange, onStatus = () => {}, filterId = null) {
     let timer = null;
     let channel = null;
     let debounce = null;
@@ -201,10 +179,10 @@
 
     ready.then(() => {
       if (mode === 'supabase') {
+        // O banco envia só um aviso (id e status) neste canal; os dados são buscados pelas funções.
         channel = sb()
           .channel('pastifico-orders')
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, fire)
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, fire)
+          .on('broadcast', { event: 'changed' }, (message) => { if (!filterId || message.payload?.id === filterId) fire(); })
           .subscribe((status) => onStatus(status === 'SUBSCRIBED' ? 'live' : status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' ? 'polling' : 'connecting'));
         timer = setInterval(onChange, 20000);
       } else {
@@ -239,11 +217,71 @@
     }, 3800);
   }
 
+  const STAFF_KEY = 'pastifico-kitchen-pin';
   const storage = {
     get(key) { try { return sessionStorage.getItem(key); } catch { return null; } },
     set(key, value) { try { sessionStorage.setItem(key, value); } catch { /* armazenamento indisponível */ } },
     remove(key) { try { sessionStorage.removeItem(key); } catch { /* armazenamento indisponível */ } }
   };
+
+  const staffPin = () => storage.get(STAFF_KEY);
+
+  /**
+   * Portão da equipe: cozinha e histórico só abrem com o PIN (no modo Supabase).
+   * Resolve quando o PIN foi validado; a tela fica bloqueada até lá.
+   */
+  async function requireStaff() {
+    await ready;
+    if (mode !== 'supabase') return null;
+    const saved = staffPin();
+    if (saved && (await checkKitchenPin(saved).catch(() => false))) return saved;
+    storage.remove(STAFF_KEY);
+
+    return new Promise((resolve) => {
+      const gate = document.createElement('div');
+      gate.className = 'modal staff-gate open';
+      gate.innerHTML = `
+        <form class="modal-card pin-card" role="dialog" aria-modal="true" aria-labelledby="gate-title">
+          <span class="brand-mark gate-mark" aria-hidden="true">P</span>
+          <p class="kicker">Área da equipe</p>
+          <h3 id="gate-title">Acesso restrito</h3>
+          <p class="muted small">Esta tela é só para os funcionários do Pastifico. Informe o PIN da cozinha.</p>
+          <input class="pin-input" type="password" inputmode="numeric" autocomplete="off" maxlength="12" placeholder="••••••" required />
+          <p class="form-error" role="alert"></p>
+          <div class="modal-actions">
+            <a class="button button-ghost" href="index.html">Ir ao cardápio</a>
+            <button class="button button-primary" type="submit">Entrar</button>
+          </div>
+        </form>`;
+      document.body.appendChild(gate);
+      document.body.classList.add('no-scroll', 'staff-locked');
+      const input = gate.querySelector('input');
+      const error = gate.querySelector('.form-error');
+      setTimeout(() => input.focus(), 50);
+      gate.querySelector('form').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const pin = input.value.trim();
+        try {
+          if (!(await checkKitchenPin(pin))) {
+            error.textContent = 'PIN incorreto.';
+            input.select();
+            return;
+          }
+          storage.set(STAFF_KEY, pin);
+          gate.remove();
+          document.body.classList.remove('no-scroll', 'staff-locked');
+          resolve(pin);
+        } catch (err) {
+          error.textContent = err.message;
+        }
+      });
+    });
+  }
+
+  function logoutStaff() {
+    storage.remove(STAFF_KEY);
+    location.reload();
+  }
 
   window.Pastifico = {
     ready,
@@ -255,6 +293,9 @@
     listOrders,
     updateOrderStatus,
     checkKitchenPin,
+    requireStaff,
+    logoutStaff,
+    staffPin,
     subscribeOrders,
     escapeHtml,
     formatCurrency,

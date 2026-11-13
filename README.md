@@ -7,18 +7,19 @@ Sistema de autoatendimento para um restaurante italiano (Pastifico), com catálo
 ## Demonstração online (GitHub Pages)
 
 - **Cardápio:** https://leohamil31.github.io/CARDAPIO-PASTIFICO/
-- **Painel da cozinha (tempo real):** https://leohamil31.github.io/CARDAPIO-PASTIFICO/kitchen.html
 - **Acompanhar pedido:** https://leohamil31.github.io/CARDAPIO-PASTIFICO/order-status.html
-- **Histórico:** https://leohamil31.github.io/CARDAPIO-PASTIFICO/order-history.html
+- **Área da equipe (exige PIN):** [cozinha](https://leohamil31.github.io/CARDAPIO-PASTIFICO/kitchen.html) e [histórico](https://leohamil31.github.io/CARDAPIO-PASTIFICO/order-history.html) — não aparecem no menu do cliente.
 
 > O repositório se chama `CARDAPIO-PASTIFICO`; o endereço antigo (`projeto-back-end-2026`) redireciona para ele.
 
 O GitHub Pages hospeda apenas arquivos estáticos, então a versão online não executa o servidor Node.js. A pasta `public/` detecta isso sozinha (`public/api.js`) e conversa **direto com o Supabase** usando a chave publicável (`public/config.js`). A segurança fica no banco ([`supabase/public-access.sql`](./supabase/public-access.sql)):
 
-- RLS permite apenas **leitura** do cardápio e dos pedidos; não existe escrita direta nas tabelas;
+- RLS permite apenas **leitura do cardápio**; as tabelas de pedidos não são públicas e não existe escrita direta em nenhuma tabela;
+- o cliente vê só o próprio pedido (`get_order`, pelo id); cozinha e histórico usam `list_orders`, que exige o **PIN da cozinha** ([`supabase/staff-only-orders.sql`](./supabase/staff-only-orders.sql));
 - pedidos são criados pela função `create_order`, que **recalcula os preços no servidor** com as mesmas regras do back-end (vinhos, refrigerantes, adicionais);
 - o status do pedido só muda pela função `update_order_status`, que exige o **PIN da cozinha** (guardado com hash em um schema privado). Para trocar o PIN, rode no SQL Editor: `select private.set_kitchen_pin('NOVO-PIN');`
-- o painel da cozinha e a tela "Meu pedido" usam o **Supabase Realtime**: um pedido novo aparece na cozinha na hora, com aviso visual e sonoro opcional.
+- o painel da cozinha e a tela "Meu pedido" atualizam em **tempo real**: um gatilho no banco envia só um aviso (id e status) pelo Supabase Realtime e as telas buscam os dados pelas funções acima;
+- ao abrir o cardápio aparece uma tela de boas-vindas com o botão **Fazer pedido** e uma animação de abertura (`public/intro.js`).
 
 Rodando localmente com `npm run dev`, o mesmo front-end usa a API REST do Express. Para forçar uma fonte, adicione `?fonte=api` ou `?fonte=supabase` à URL.
 

@@ -69,5 +69,5 @@ if (!orderId) {
 } else {
   if (params.get('novo')) toast('Pedido enviado para a cozinha!', 'success');
   load();
-  window.Pastifico.subscribeOrders(load);
+  window.Pastifico.subscribeOrders(load, () => {}, orderId);
 }
