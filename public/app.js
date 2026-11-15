@@ -353,9 +353,16 @@ function renderCart() {
 /** A foto do prato "voa" até o carrinho (ou até o botão "Ver pedido" no celular). */
 function flyToCart(source) {
   if (!source || !source.src || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  const target = getComputedStyle(els.fab).display !== 'none' ? els.fab : els.cartCount;
   const from = source.getBoundingClientRect();
-  const to = target.getBoundingClientRect();
+  let to;
+  if (getComputedStyle(els.fab).display !== 'none') {
+    // No celular o botão "Ver pedido" pode ainda estar escondido (fora da tela) no primeiro item:
+    // mira na posição onde ele aparece, no centro de baixo da tela.
+    const bottom = parseFloat(getComputedStyle(els.fab).bottom) || 16;
+    to = { left: window.innerWidth / 2 - 24, top: window.innerHeight - bottom - 48, width: 48, height: 48 };
+  } else {
+    to = els.cartCount.getBoundingClientRect();
+  }
   if (!from.width || !to.width) return;
   const ghost = source.cloneNode();
   ghost.className = 'fly-ghost';
