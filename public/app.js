@@ -552,8 +552,6 @@ async function init() {
     const { categories, products } = await window.Pastifico.getCatalog();
     state.categories = categories;
     state.products = products;
-    const factItems = $('#fact-items');
-    if (factItems) factItems.textContent = String(products.filter((product) => product.isAvailable).length);
     // Descarta do carrinho salvo itens que não existem mais.
     state.cart = state.cart.filter((item) => products.some((product) => product.id === item.productId && product.isAvailable));
     saveCart();
