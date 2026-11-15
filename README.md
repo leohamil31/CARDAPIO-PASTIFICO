@@ -113,22 +113,24 @@ O projeto possui 4 entidades, formando dois pares relacionados por chave estrang
 
 ```
 src/
-├── config/          # Conexão com Supabase e persistência local (fallback em JSON)
-├── controllers/     # Recebem a requisição HTTP, validam entrada e chamam os repositories
-├── docs/            # Especificação OpenAPI (Swagger) da API
-├── middlewares/      # asyncHandler (captura de erros assíncronos) e errorHandler central
-├── models/            # Interfaces/tipos das entidades (Category, Product, Order)
-├── repositories/       # Acesso a dados (Supabase ou JSON local) para cada entidade
-├── routes/              # Definição das rotas Express de cada recurso
-├── utils/                 # Validação de entrada, UUID e utilitários
-├── app.ts                  # Configuração do Express (middlewares, rotas, tratamento de erro)
-└── server.ts                 # Ponto de entrada; inicia o servidor HTTP
+├── config/        # Conexão com Supabase e persistência local (fallback em JSON)
+├── controllers/   # Recebem a requisição HTTP, validam a entrada e chamam os repositories
+├── docs/          # Especificação OpenAPI (Swagger) da API
+├── middlewares/   # asyncHandler (erros assíncronos) e errorHandler central
+├── models/        # Interfaces das entidades (Category, Product, Order)
+├── repositories/  # Acesso a dados (Supabase ou JSON local) de cada entidade
+├── routes/        # Rotas Express de cada recurso
+├── utils/         # Validação de entrada, UUID e utilitários
+├── app.ts         # Configuração do Express (middlewares, rotas, tratamento de erros)
+└── server.ts      # Ponto de entrada; inicia o servidor HTTP
 
-tests/        # Testes automatizados por recurso (categorias, produtos, pedidos, sistema)
-scripts/      # Script de migração do JSON local para o Supabase
-supabase/     # Scripts SQL (schema e reset) para criar/recriar as tabelas
-public/       # Front-end estático (cardápio, cozinha, status, histórico) — também publicado no GitHub Pages
-data/         # Banco de dados local em JSON (fallback quando o Supabase não está configurado)
+tests/       # Testes automatizados por recurso (categorias, produtos, pedidos, sistema)
+scripts/     # Migração do JSON local para o Supabase e abertura das telas no navegador
+supabase/    # Scripts SQL: schema, acesso público (GitHub Pages), pedidos da equipe e reset
+public/      # Front-end (cardápio, meu pedido, cozinha, histórico), também publicado no GitHub Pages
+postman/     # Coleção e ambiente do Postman
+data/        # Banco local em JSON (usado quando o Supabase não está configurado)
+.github/     # CI (testes a cada push) e deploy do GitHub Pages
 ```
 
 ## 6. Configuração e execução
@@ -345,7 +347,7 @@ npm run test:coverage
 
 - 75 testes em `tests/` cobrindo todas as rotas de Categorias, Produtos e Pedidos (casos de sucesso, 400, 404 e 409), regras de preço dos adicionais, painel da cozinha, documentação e o middleware de erros.
 - Cada arquivo de teste usa um banco JSON temporário próprio (variável `PASTIFICO_DB_PATH`), então `data/pastifico-db.json` não é alterado e o Supabase nunca é acessado, mesmo com o `.env` preenchido.
-- `npm run test:coverage` usa a cobertura nativa do Node.js (`--experimental-test-coverage`) apenas sobre `src/` e encerra com erro se a cobertura de linhas ficar abaixo de **60%**. Cobertura atual: ~89% das linhas (os trechos não cobertos são os ramos específicos do Supabase).
+- `npm run test:coverage` usa a cobertura nativa do Node.js (`--experimental-test-coverage`) apenas sobre `src/` e encerra com erro se a cobertura de linhas ficar abaixo de **60%**. Cobertura atual: ~88% das linhas (os trechos não cobertos são os ramos específicos do Supabase).
 
 ## Testar no Postman
 
