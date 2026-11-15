@@ -206,6 +206,10 @@
       region.setAttribute('aria-live', 'polite');
       document.body.appendChild(region);
     }
+    // Mostra no máximo 2 avisos ao mesmo tempo (no celular, 1) para não cobrir a tela.
+    const max = window.matchMedia('(max-width: 900px)').matches ? 1 : 2;
+    const visible = Array.from(region.children);
+    visible.slice(0, Math.max(0, visible.length - max + 1)).forEach((old) => old.remove());
     const element = document.createElement('div');
     element.className = `toast toast-${type}`;
     element.textContent = message;

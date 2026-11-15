@@ -48,6 +48,7 @@
       return;
     }
 
+    intro.scrollTop = 0;
     intro.classList.add('is-loading');
     await wait(1300);
 
