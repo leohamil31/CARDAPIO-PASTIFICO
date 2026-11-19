@@ -87,7 +87,7 @@
     const wanted = forced || config.mode || 'auto';
 
     if (wanted === 'api') mode = 'api';
-    else if (wanted === 'supabase' || location.hostname.endsWith('github.io')) mode = 'supabase';
+    else if (wanted === 'supabase' || location.hostname.endsWith('github.io') || location.hostname.endsWith('vercel.app')) mode = 'supabase';
     else mode = (await probeApi()) ? 'api' : 'supabase';
 
     if (mode === 'supabase') {
