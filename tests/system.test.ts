@@ -58,6 +58,14 @@ describe('Sistema', () => {
     assert.match(response.text, /swagger-ui/);
   });
 
+  test('respostas trazem cabeçalhos básicos de segurança', async () => {
+    const response = await api().get('/api/health');
+
+    assert.equal(response.headers['x-content-type-options'], 'nosniff');
+    assert.equal(response.headers['x-frame-options'], 'DENY');
+    assert.equal(response.headers['x-powered-by'], undefined);
+  });
+
   test('páginas do front-end respondem 200', async () => {
     for (const path of ['/', '/kitchen-dashboard', '/order-status', '/order-history']) {
       const response = await api().get(path);

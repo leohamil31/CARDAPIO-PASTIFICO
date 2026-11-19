@@ -34,6 +34,24 @@ export const requireString = (value: unknown, field: string, maxLength = 255): s
 export const optionalString = (value: unknown, field: string, maxLength = 255): string | undefined =>
   value === undefined ? undefined : requireString(value, field, maxLength);
 
+/**
+ * Lê a URL da imagem do produto. Aceita só caminho relativo ao site ("/images/x.jpg")
+ * ou endereço http(s). Bloqueia esquemas como "javascript:" e "data:", que poderiam
+ * ser usados para injetar conteúdo quando a imagem é exibida no front-end.
+ */
+export const requireImageUrl = (value: unknown, field = 'image'): string => {
+  const url = requireString(value, field, 2048);
+  const isRelative = url.startsWith('/') && !url.startsWith('//');
+  const isHttp = /^https?:\/\/[^\s]+$/i.test(url);
+  if (!isRelative && !isHttp) {
+    throw new HttpError(400, `O campo "${field}" deve ser um caminho começando com "/" ou uma URL http(s).`);
+  }
+  return url;
+};
+
+export const optionalImageUrl = (value: unknown, field = 'image'): string | undefined =>
+  value === undefined ? undefined : requireImageUrl(value, field);
+
 /** Lê um preço (aceita número ou texto numérico), >= 0 e com no máximo 2 casas. */
 export const requirePrice = (value: unknown, field = 'price'): number => {
   const price = typeof value === 'string' && value.trim() !== '' ? Number(value) : value;

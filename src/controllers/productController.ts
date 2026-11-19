@@ -4,7 +4,7 @@ import { categoryRepository } from '../repositories/categoryRepository';
 import { asyncHandler } from '../middlewares/asyncHandler';
 import { HttpError } from '../middlewares/errorHandler';
 import { getIdParam } from '../utils/params';
-import { getBody, optionalBoolean, optionalString, requirePrice, requireString, requireUuid } from '../utils/validation';
+import { getBody, optionalBoolean, optionalImageUrl, optionalString, requireImageUrl, requirePrice, requireString, requireUuid } from '../utils/validation';
 
 /** Garante que a categoria informada existe (evita produto "órfão" ou erro de FK no banco). */
 const ensureCategoryExists = async (categoryId: string): Promise<void> => {
@@ -36,7 +36,7 @@ export const storeProduct = asyncHandler(async (req: Request, res: Response): Pr
     name: requireString(body.name, 'name', 120),
     description: requireString(body.description, 'description', 1000),
     price: requirePrice(body.price),
-    image: requireString(body.image, 'image', 2048),
+    image: requireImageUrl(body.image),
     isAvailable: optionalBoolean(body.isAvailable, 'isAvailable') ?? true,
     categoryId: requireUuid(body.categoryId, 'categoryId')
   };
@@ -55,7 +55,7 @@ export const updateProductController = asyncHandler(async (req: Request, res: Re
   const changes: ProductChanges = {};
   const name = optionalString(body.name, 'name', 120);
   const description = optionalString(body.description, 'description', 1000);
-  const image = optionalString(body.image, 'image', 2048);
+  const image = optionalImageUrl(body.image);
   const isAvailable = optionalBoolean(body.isAvailable, 'isAvailable');
 
   if (name !== undefined) changes.name = name;

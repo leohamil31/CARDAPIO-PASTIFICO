@@ -52,7 +52,7 @@ function render(order) {
 
     <ul class="summary-items">
       ${order.items.map((item) => `
-        <li><span>${item.quantity}× ${escapeHtml(item.name)}${item.options?.length ? `<small>${escapeHtml(item.options.join(', '))}</small>` : ''}</span>
+        <li><span>${escapeHtml(item.quantity)}× ${escapeHtml(item.name)}${item.options?.length ? `<small>${escapeHtml(item.options.join(', '))}</small>` : ''}</span>
         <strong>${formatCurrency(item.subtotal)}</strong></li>`).join('')}
     </ul>
     <div class="summary-total"><span>Total</span><strong>${formatCurrency(order.total)}</strong></div>

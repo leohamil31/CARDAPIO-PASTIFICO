@@ -23,7 +23,7 @@ function render() {
         <span class="status-badge status-${escapeHtml(order.status.toLowerCase())}">${escapeHtml(order.status)}</span>
       </header>
       <ul>
-        ${order.items.map((item) => `<li><span>${item.quantity}× ${escapeHtml(item.name)}</span><span>${formatCurrency(item.subtotal)}</span></li>`).join('')}
+        ${order.items.map((item) => `<li><span>${escapeHtml(item.quantity)}× ${escapeHtml(item.name)}</span><span>${formatCurrency(item.subtotal)}</span></li>`).join('')}
       </ul>
       <footer><span>${escapeHtml(order.paymentMethod)}</span><strong>${formatCurrency(order.total)}</strong></footer>
     </article>`).join('');

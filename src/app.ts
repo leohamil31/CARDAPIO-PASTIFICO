@@ -13,6 +13,18 @@ const app = express();
 const publicDir = path.join(process.cwd(), 'public');
 
 app.disable('x-powered-by');
+
+// Cabeçalhos básicos de segurança (sem dependências extras):
+// - nosniff: o navegador não "adivinha" o tipo do arquivo;
+// - frame-ancestors/X-Frame-Options: impede que as telas sejam abertas dentro de iframe de outro site;
+// - Referrer-Policy: não vaza a URL completa (com id do pedido) para sites externos.
+app.use((_req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Content-Security-Policy', "frame-ancestors 'none'");
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  next();
+});
 app.use(express.json({ limit: '100kb' }));
 app.use(express.static(publicDir));
 
@@ -76,11 +88,11 @@ app.get('/api-docs', (_req, res) => {
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Pastifico API - Documentação</title>
-  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css" />
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.17.14/swagger-ui.css" />
 </head>
 <body>
   <div id="swagger-ui"></div>
-  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js" crossorigin></script>
+  <script src="https://unpkg.com/swagger-ui-dist@5.17.14/swagger-ui-bundle.js" crossorigin></script>
   <script>
     window.ui = SwaggerUIBundle({ url: '/api-docs/openapi.json', dom_id: '#swagger-ui' });
   </script>

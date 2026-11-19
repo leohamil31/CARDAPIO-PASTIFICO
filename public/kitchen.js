@@ -19,28 +19,74 @@ const els = {
 
 let orders = [];
 let knownIds = null;
-let soundOn = storage.get('pastifico-sound') === '1';
+// O som fica LIGADO por padrão; só desliga se a equipe apertar o botão.
+// (Chave nova: ignora o "desligado" salvo pela versão antiga, que começava sem som.)
+let soundOn = storage.get('pastifico-som') !== 'off';
 let pin = null;
 
 // ---------- som de novo pedido (Web Audio, sem arquivos) ----------
-function chime() {
-  if (!soundOn) return;
-  try {
-    const context = new (window.AudioContext || window.webkitAudioContext)();
+// Um único AudioContext para a página inteira. Antes era criado um contexto novo
+// a cada aviso: o navegador limita a quantidade de contextos e, sem um toque do
+// usuário, eles nascem "suspensos" (mudos) — por isso o som parava de tocar.
+let audioContext = null;
+let pendingChime = false;
+
+function getAudioContext() {
+  const AudioCtor = window.AudioContext || window.webkitAudioContext;
+  if (!AudioCtor) return null;
+  if (!audioContext || audioContext.state === 'closed') audioContext = new AudioCtor();
+  return audioContext;
+}
+
+function playTones(context) {
+  const start = context.currentTime + 0.02;
+  // Toca a sequência duas vezes para chamar a atenção na cozinha.
+  [0, 0.9].forEach((offset) => {
     [880, 1320].forEach((frequency, index) => {
+      const at = start + offset + index * 0.18;
       const oscillator = context.createOscillator();
       const gain = context.createGain();
       oscillator.frequency.value = frequency;
       oscillator.type = 'sine';
-      gain.gain.setValueAtTime(0.0001, context.currentTime + index * 0.18);
-      gain.gain.exponentialRampToValueAtTime(0.25, context.currentTime + index * 0.18 + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + index * 0.18 + 0.35);
+      gain.gain.setValueAtTime(0.0001, at);
+      gain.gain.exponentialRampToValueAtTime(0.3, at + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.35);
       oscillator.connect(gain).connect(context.destination);
-      oscillator.start(context.currentTime + index * 0.18);
-      oscillator.stop(context.currentTime + index * 0.18 + 0.4);
+      oscillator.start(at);
+      oscillator.stop(at + 0.4);
     });
-  } catch { /* áudio indisponível */ }
+  });
 }
+
+async function chime() {
+  if (!soundOn) return;
+  const context = getAudioContext();
+  if (!context) return;
+  try {
+    if (context.state !== 'running') await context.resume();
+  } catch { /* segue para a checagem abaixo */ }
+  if (context.state !== 'running') {
+    // O navegador bloqueou o áudio porque ninguém tocou na tela ainda:
+    // guarda o aviso e toca no primeiro toque/clique.
+    if (!pendingChime) toast('Toque na tela para ativar o som dos pedidos.', 'info');
+    pendingChime = true;
+    return;
+  }
+  pendingChime = false;
+  try { playTones(context); } catch { /* áudio indisponível */ }
+}
+
+/** Qualquer interação da equipe "destrava" o áudio para os próximos pedidos. */
+function unlockAudio() {
+  const context = getAudioContext();
+  if (!context) return;
+  const after = () => { if (pendingChime) chime(); };
+  if (context.state === 'running') after();
+  else context.resume().then(after, () => {});
+}
+['pointerdown', 'keydown', 'touchstart'].forEach((type) => {
+  document.addEventListener(type, unlockAudio, { capture: true, passive: true });
+});
 
 function renderSoundButton() {
   els.sound.textContent = soundOn ? 'Som ligado' : 'Som desligado';
@@ -63,7 +109,7 @@ function card(order, isNew) {
       </header>
       <ul class="ticket-items">
         ${order.items.map((item) => `
-          <li><b>${item.quantity}×</b> <span>${escapeHtml(item.name)}${item.options?.length ? `<small>${escapeHtml(item.options.join(' · '))}</small>` : ''}</span></li>`).join('')}
+          <li><b>${escapeHtml(item.quantity)}×</b> <span>${escapeHtml(item.name)}${item.options?.length ? `<small>${escapeHtml(item.options.join(' · '))}</small>` : ''}</span></li>`).join('')}
       </ul>
       <footer class="ticket-footer">
         <span class="ticket-pay">${escapeHtml(order.paymentMethod)} · ${formatCurrency(order.total)}</span>
@@ -133,7 +179,7 @@ els.board.addEventListener('click', (event) => {
 
 els.sound.addEventListener('click', () => {
   soundOn = !soundOn;
-  storage.set('pastifico-sound', soundOn ? '1' : '0');
+  storage.set('pastifico-som', soundOn ? 'on' : 'off');
   renderSoundButton();
   if (soundOn) chime();
 });
