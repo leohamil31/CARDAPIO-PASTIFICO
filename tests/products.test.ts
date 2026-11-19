@@ -74,6 +74,14 @@ describe('Produtos', () => {
       assert.equal(response.status, 400);
     });
 
+    test('retorna 400 para imagem com esquema perigoso (javascript:, data:)', async () => {
+      for (const image of ['javascript:alert(1)', 'data:text/html,<b>x</b>', '//evil.example/x.jpg']) {
+        const response = await createProduct({ image });
+        assert.equal(response.status, 400, image);
+        assert.match(response.body.message, /image/);
+      }
+    });
+
     test('retorna 400 para categoryId inválido ou inexistente', async () => {
       const invalid = await api().post('/products').send({
         name: unique('P'), description: 'd', price: 1, image: '/i.jpg', categoryId: 'massas'

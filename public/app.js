@@ -1,4 +1,4 @@
-const { escapeHtml, formatCurrency, toast, storage } = window.Pastifico;
+const { escapeHtml, safeUrl, formatCurrency, toast, storage } = window.Pastifico;
 
 const state = {
   categories: [],
@@ -178,7 +178,7 @@ function productCard(product, index) {
     <article class="product-card reveal ${unavailable ? 'is-unavailable' : ''}" style="--i:${index % 9}" data-product-id="${escapeHtml(product.id)}"
       tabindex="${unavailable ? -1 : 0}" role="button" aria-label="${escapeHtml(product.name)}, ${formatCurrency(product.price)}${unavailable ? ', indisponível' : ''}">
       <div class="product-media" data-name="${escapeHtml(product.name)}">
-        <img src="${escapeHtml(product.image)}" alt="" loading="lazy" decoding="async" />
+        <img src="${escapeHtml(safeUrl(product.image))}" alt="" loading="lazy" decoding="async" />
         ${unavailable ? '<span class="badge badge-muted">Indisponível</span>' : ''}
       </div>
       <div class="product-body">
@@ -262,7 +262,7 @@ function openCustomize(product) {
   state.quantity = 1;
   els.customizeImage.closest('.customize-media').classList.remove('no-image');
   els.customizeImage.closest('.customize-media').dataset.name = product.name;
-  els.customizeImage.src = product.image;
+  els.customizeImage.src = safeUrl(product.image);
   els.customizeImage.alt = product.name;
   els.customizeTitle.textContent = product.name;
   els.customizeDescription.textContent = product.description;
@@ -271,7 +271,7 @@ function openCustomize(product) {
   els.customizeOptions.innerHTML = options.length
     ? options.map((option) => `
         <label class="option">
-          <input type="${option.type || 'checkbox'}" name="${option.group || option.id}" value="${option.id}" ${option.default ? 'checked' : ''} />
+          <input type="${option.type === 'radio' ? 'radio' : 'checkbox'}" name="${escapeHtml(option.group || option.id)}" value="${escapeHtml(option.id)}" ${option.default ? 'checked' : ''} />
           <span class="option-name">${escapeHtml(option.name)}</span>
           <span class="option-price">${Number.isFinite(option.replacePrice) ? formatCurrency(option.replacePrice) : `+ ${formatCurrency(option.price)}`}</span>
         </label>`).join('')
@@ -336,7 +336,7 @@ function renderCart() {
 
   els.cartItems.innerHTML = state.cart.map((item) => `
     <div class="cart-item">
-      <img src="${escapeHtml(item.image)}" alt="" loading="lazy" />
+      <img src="${escapeHtml(safeUrl(item.image))}" alt="" loading="lazy" />
       <div class="cart-item-info">
         <strong>${escapeHtml(item.name)}</strong>
         <small>${item.options.length ? escapeHtml(item.options.join(' · ')) : 'Receita original'}</small>
@@ -344,7 +344,7 @@ function renderCart() {
       </div>
       <div class="stepper stepper-small">
         <button type="button" data-key="${escapeHtml(item.key)}" data-delta="-1" aria-label="Remover um ${escapeHtml(item.name)}">−</button>
-        <output>${item.quantity}</output>
+        <output>${escapeHtml(item.quantity)}</output>
         <button type="button" data-key="${escapeHtml(item.key)}" data-delta="1" aria-label="Adicionar um ${escapeHtml(item.name)}">+</button>
       </div>
     </div>`).join('');
@@ -427,7 +427,7 @@ function renderCheckoutSummary() {
     </dl>
     <ul class="summary-items">
       ${state.cart.map((item) => `
-        <li><span>${item.quantity}× ${escapeHtml(item.name)}${item.options.length ? `<small>${escapeHtml(item.options.join(', '))}</small>` : ''}</span>
+        <li><span>${escapeHtml(item.quantity)}× ${escapeHtml(item.name)}${item.options.length ? `<small>${escapeHtml(item.options.join(', '))}</small>` : ''}</span>
         <strong>${formatCurrency(item.price * item.quantity)}</strong></li>`).join('')}
     </ul>
     <div class="summary-total"><span>Total estimado</span><strong>${formatCurrency(cartTotal())}</strong></div>`;

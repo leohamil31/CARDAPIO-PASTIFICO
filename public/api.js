@@ -6,7 +6,7 @@
  */
 (function () {
   const config = window.PASTIFICO_CONFIG || {};
-  const SUPABASE_CDN = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js';
+  const SUPABASE_CDN = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/dist/umd/supabase.min.js';
 
   let mode = null;
   let supabaseClient = null;
@@ -15,6 +15,19 @@
   const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
   })[char]);
+
+  /**
+   * URL segura para usar em src/href: aceita caminho relativo ou http(s).
+   * Qualquer outro esquema (javascript:, data:...) vira string vazia.
+   */
+  const safeUrl = (value) => {
+    // Remove espaços/caracteres de controle que o navegador ignora (ex.: "java\tscript:").
+    const url = String(value ?? '').replace(/[\u0000-\u0020\u007f]/g, '');
+    if (!url) return '';
+    if (/^https?:\/\//i.test(url)) return url;
+    if (!/^[a-z][a-z0-9+.-]*:/i.test(url) && !url.startsWith('//')) return url;
+    return '';
+  };
 
   const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
   const formatCurrency = (value) => currency.format(Number(value) || 0);
@@ -302,6 +315,7 @@
     staffPin,
     subscribeOrders,
     escapeHtml,
+    safeUrl,
     formatCurrency,
     normalizeImage,
     timeAgo,
