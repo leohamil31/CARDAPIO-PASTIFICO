@@ -58,6 +58,21 @@ describe('Sistema', () => {
     assert.match(response.text, /swagger-ui/);
   });
 
+  test('com KITCHEN_PIN definido, rotas da equipe exigem o cabeçalho x-kitchen-pin', async () => {
+    process.env.KITCHEN_PIN = '4321';
+    try {
+      assert.equal((await api().get('/orders')).status, 401);
+      assert.equal((await api().get('/orders').set('x-kitchen-pin', '0000')).status, 401);
+      assert.equal((await api().get('/orders').set('x-kitchen-pin', '4321')).status, 200);
+      assert.equal((await api().get('/kitchen')).status, 401);
+      assert.equal((await api().post('/categories').send({ name: 'x', description: 'y' })).status, 401);
+      // O cardápio continua público para o cliente.
+      assert.equal((await api().get('/products')).status, 200);
+    } finally {
+      delete process.env.KITCHEN_PIN;
+    }
+  });
+
   test('respostas trazem cabeçalhos básicos de segurança', async () => {
     const response = await api().get('/api/health');
 

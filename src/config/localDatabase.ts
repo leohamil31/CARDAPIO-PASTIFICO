@@ -1,4 +1,5 @@
 import fs from 'fs';
+import os from 'node:os';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { Category } from '../models/Category';
@@ -16,7 +17,13 @@ export interface PersistedDatabase {
  * (os testes automatizados usam um arquivo temporário para não alterar
  * `data/pastifico-db.json`). Lido a cada chamada para respeitar mudanças.
  */
-const getDbPath = (): string => process.env.PASTIFICO_DB_PATH || path.join(process.cwd(), 'data', 'pastifico-db.json');
+const getDbPath = (): string => {
+  if (process.env.PASTIFICO_DB_PATH) return process.env.PASTIFICO_DB_PATH;
+  // Na Vercel o disco do projeto é somente leitura: o JSON vai para a pasta temporária.
+  // (É só um modo de demonstração; em produção configure o Supabase.)
+  if (process.env.VERCEL) return path.join(os.tmpdir(), 'pastifico-db.json');
+  return path.join(process.cwd(), 'data', 'pastifico-db.json');
+};
 
 /**
  * Conteúdo de exemplo (seed) usado apenas quando o arquivo local ainda não existe.

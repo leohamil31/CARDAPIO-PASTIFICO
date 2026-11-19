@@ -192,13 +192,26 @@ O arquivo `.env.example` documenta as variáveis necessárias (sem valores reais
 ```
 SUPABASE_URL=
 SUPABASE_SERVICE_ROLE_KEY=
+KITCHEN_PIN=
 ```
 
 - Se **ambas** estiverem vazias, a API usa automaticamente o arquivo local `data/pastifico-db.json` para persistir os dados.
 - Se **ambas** estiverem preenchidas com as credenciais do seu projeto Supabase, a API passa a usar o Supabase/PostgreSQL. O health check consulta `categories` e retorna `database: "connected"`; falhas de conexão ou de schema retornam HTTP 503 e `database: "unavailable"`.
 - Se apenas uma das duas variáveis estiver preenchida, a API retorna erro de configuração em vez de trocar silenciosamente para o banco local.
 
+- `KITCHEN_PIN` (opcional): quando definida, as rotas da equipe passam a exigir o cabeçalho `x-kitchen-pin` com esse valor — listagem de pedidos (`GET /orders`, `/orders/kitchen`, `/orders/table/:n`, `/kitchen`), mudança de status, exclusão de pedidos e o cadastro de categorias/produtos (`POST`/`PUT`/`DELETE`). Cardápio, criação de pedido e consulta de um pedido pelo id continuam públicos. Deixe vazia no desenvolvimento local e nos testes.
+
 **Importante:** o arquivo `.env` com as credenciais reais nunca é enviado ao Git (está listado no `.gitignore`). Apenas o `.env.example`, com os nomes das variáveis vazios, é versionado.
+
+### Deploy na Vercel
+
+O projeto já está pronto para a Vercel ([`vercel.json`](./vercel.json)). A Vercel detecta o Express sozinha pelo `src/app.ts` (que exporta o `app`) e serve a pasta `public/` pela CDN.
+
+1. Acesse [vercel.com/new](https://vercel.com/new), entre com o GitHub e importe o repositório `CARDAPIO-PASTIFICO`. Não é preciso mudar o comando de build nem a pasta de saída.
+2. Em **Settings → Environment Variables**, cadastre `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` e `KITCHEN_PIN` (use o mesmo PIN da cozinha). Sem o Supabase, a API usa um JSON temporário que é apagado a cada reinício — serve só para demonstração.
+3. Clique em **Deploy**. A cada push na `main` a Vercel publica uma nova versão; cada pull request ganha uma URL de pré-visualização.
+
+No domínio `*.vercel.app`, as telas falam direto com o Supabase (com o PIN da cozinha), igual ao GitHub Pages; a API Express fica disponível no mesmo endereço para o Postman e a documentação (`/api-docs`).
 
 ## 8. Banco de dados
 
