@@ -4,10 +4,21 @@ import { isSupabaseConfigured, requireSupabaseClient } from '../config/supabaseC
 import { ensureDatabaseFile, saveDatabase } from '../config/localDatabase';
 import { isValidUuid } from '../utils/uuid';
 import { escapeLikePattern } from '../utils/text';
-import { HttpError } from '../middlewares/errorHandler';
+import { ConflictError } from '../errors/HttpError';
 
 export type ProductInput = Omit<Product, 'id' | 'createdAt'>;
 export type ProductChanges = Partial<ProductInput>;
+
+/** Contrato da camada de acesso a dados de produtos. */
+export interface IProductRepository {
+  findAll(): Promise<Product[]>;
+  findById(id: string): Promise<Product | undefined>;
+  findByName(name: string): Promise<Product | undefined>;
+  countByCategory(categoryId: string): Promise<number>;
+  create(input: ProductInput): Promise<Product>;
+  update(id: string, changes: ProductChanges): Promise<Product | undefined>;
+  remove(id: string): Promise<boolean>;
+}
 
 interface ProductRow {
   id: string;
@@ -20,76 +31,107 @@ interface ProductRow {
   created_at: string;
 }
 
-const IN_USE_MESSAGE = 'Não é possível remover: o produto já aparece em pedidos. Marque-o como indisponível (isAvailable: false).';
-const DUPLICATE_MESSAGE = 'Já existe um produto com esse nome.';
+export const PRODUCT_IN_USE_MESSAGE = 'Não é possível remover: o produto já aparece em pedidos. Marque-o como indisponível (isAvailable: false).';
 
-const mapProduct = (row: ProductRow): Product => ({
-  id: row.id,
-  name: row.name,
-  description: row.description,
-  price: Number(row.price),
-  image: row.image,
-  isAvailable: row.is_available,
-  categoryId: row.category_id,
-  createdAt: row.created_at
-});
+/**
+ * Repository de produtos: leitura e gravação no Supabase/PostgreSQL (ou no JSON
+ * local). Converte os nomes de colunas do banco (snake_case) para o model.
+ */
+export class ProductRepository implements IProductRepository {
+  private static readonly TABLE = 'products';
 
-const findAllLocal = (): Product[] => ensureDatabaseFile().products;
+  private static toEntity(row: ProductRow): Product {
+    return {
+      id: row.id,
+      name: row.name,
+      description: row.description,
+      price: Number(row.price),
+      image: row.image,
+      isAvailable: row.is_available,
+      categoryId: row.category_id,
+      createdAt: row.created_at
+    };
+  }
 
-const persistLocal = (products: Product[]): void => {
-  const db = ensureDatabaseFile();
-  saveDatabase({ ...db, products });
-};
+  /** Converte os campos do model para as colunas da tabela `products`. */
+  private static toRow(changes: ProductChanges): Record<string, unknown> {
+    const row: Record<string, unknown> = {};
+    if (changes.name !== undefined) row.name = changes.name;
+    if (changes.description !== undefined) row.description = changes.description;
+    if (changes.price !== undefined) row.price = changes.price;
+    if (changes.image !== undefined) row.image = changes.image;
+    if (changes.isAvailable !== undefined) row.is_available = changes.isAvailable;
+    if (changes.categoryId !== undefined) row.category_id = changes.categoryId;
+    return row;
+  }
 
-export const productRepository = {
+  private readLocal(): Product[] {
+    return ensureDatabaseFile().products;
+  }
+
+  private writeLocal(products: Product[]): void {
+    saveDatabase({ ...ensureDatabaseFile(), products });
+  }
+
   async findAll(): Promise<Product[]> {
     if (isSupabaseConfigured()) {
-      const { data, error } = await requireSupabaseClient().from('products').select('*').order('name');
+      const { data, error } = await requireSupabaseClient().from(ProductRepository.TABLE).select('*').order('name');
       if (error) throw error;
-      return (data ?? []).map(mapProduct);
+      return (data ?? []).map(ProductRepository.toEntity);
     }
-    return findAllLocal();
-  },
+    return this.readLocal();
+  }
 
   async findById(id: string): Promise<Product | undefined> {
     if (isSupabaseConfigured()) {
       if (!isValidUuid(id)) return undefined;
-      const { data, error } = await requireSupabaseClient().from('products').select('*').eq('id', id).maybeSingle();
+      const { data, error } = await requireSupabaseClient().from(ProductRepository.TABLE).select('*').eq('id', id).maybeSingle();
       if (error) throw error;
-      return data ? mapProduct(data) : undefined;
+      return data ? ProductRepository.toEntity(data) : undefined;
     }
-    return findAllLocal().find((product) => product.id === id);
-  },
+    return this.readLocal().find((product) => product.id === id);
+  }
+
+  /** Busca pelo nome sem diferenciar maiúsculas/minúsculas. */
+  async findByName(name: string): Promise<Product | undefined> {
+    const trimmed = name.trim();
+    if (isSupabaseConfigured()) {
+      const { data, error } = await requireSupabaseClient().from(ProductRepository.TABLE).select('*').ilike('name', escapeLikePattern(trimmed)).limit(1);
+      if (error) throw error;
+      return data && data.length > 0 ? ProductRepository.toEntity(data[0]) : undefined;
+    }
+    const lower = trimmed.toLowerCase();
+    return this.readLocal().find((product) => product.name.toLowerCase() === lower);
+  }
+
+  async countByCategory(categoryId: string): Promise<number> {
+    if (isSupabaseConfigured()) {
+      if (!isValidUuid(categoryId)) return 0;
+      const { count, error } = await requireSupabaseClient()
+        .from(ProductRepository.TABLE)
+        .select('id', { count: 'exact', head: true })
+        .eq('category_id', categoryId);
+      if (error) throw error;
+      return count ?? 0;
+    }
+    return this.readLocal().filter((product) => product.categoryId === categoryId).length;
+  }
 
   async create(input: ProductInput): Promise<Product> {
-    const name = input.name.trim();
-
     if (isSupabaseConfigured()) {
-      const supabase = requireSupabaseClient();
-      const { data: existing, error: existingError } = await supabase.from('products').select('id').ilike('name', escapeLikePattern(name)).limit(1);
-      if (existingError) throw existingError;
-      if (existing && existing.length > 0) throw new HttpError(409, DUPLICATE_MESSAGE);
-
-      const { data, error } = await supabase.from('products').insert({
-        id: randomUUID(),
-        name,
-        description: input.description,
-        price: input.price,
-        image: input.image,
-        is_available: input.isAvailable,
-        category_id: input.categoryId
-      }).select().single();
+      const { data, error } = await requireSupabaseClient()
+        .from(ProductRepository.TABLE)
+        .insert({ id: randomUUID(), ...ProductRepository.toRow(input) })
+        .select()
+        .single();
       if (error) throw error;
-      return mapProduct(data);
+      return ProductRepository.toEntity(data);
     }
 
-    const products = findAllLocal();
-    const existingProduct = products.find((product) => product.name.toLowerCase() === name.toLowerCase());
-    if (existingProduct) throw new HttpError(409, DUPLICATE_MESSAGE);
-
+    const products = this.readLocal();
     const product: Product = {
       id: randomUUID(),
-      name,
+      name: input.name,
       description: input.description,
       price: input.price,
       image: input.image,
@@ -97,67 +139,49 @@ export const productRepository = {
       categoryId: input.categoryId,
       createdAt: new Date().toISOString()
     };
-
     products.push(product);
-    persistLocal(products);
+    this.writeLocal(products);
     return product;
-  },
+  }
 
   async update(id: string, changes: ProductChanges): Promise<Product | undefined> {
     if (isSupabaseConfigured()) {
       if (!isValidUuid(id)) return undefined;
-      const payload: Record<string, unknown> = { ...changes };
-      if ('isAvailable' in changes) {
-        payload.is_available = changes.isAvailable;
-        delete payload.isAvailable;
-      }
-      if ('categoryId' in changes) {
-        payload.category_id = changes.categoryId;
-        delete payload.categoryId;
-      }
-      const { data, error } = await requireSupabaseClient().from('products').update(payload).eq('id', id).select().maybeSingle();
+      const { data, error } = await requireSupabaseClient()
+        .from(ProductRepository.TABLE)
+        .update(ProductRepository.toRow(changes))
+        .eq('id', id)
+        .select()
+        .maybeSingle();
       if (error) throw error;
-      return data ? mapProduct(data) : undefined;
+      return data ? ProductRepository.toEntity(data) : undefined;
     }
 
-    const products = findAllLocal();
+    const products = this.readLocal();
     const product = products.find((current) => current.id === id);
     if (!product) return undefined;
 
-    if (changes.name !== undefined) {
-      const newName = changes.name.toLowerCase();
-      if (products.some((current) => current.id !== id && current.name.toLowerCase() === newName)) {
-        throw new HttpError(409, DUPLICATE_MESSAGE);
-      }
-    }
-
     Object.assign(product, changes);
-    persistLocal(products);
+    this.writeLocal(products);
     return product;
-  },
+  }
 
   async remove(id: string): Promise<boolean> {
     if (isSupabaseConfigured()) {
       if (!isValidUuid(id)) return false;
-      const { error, count } = await requireSupabaseClient().from('products').delete({ count: 'exact' }).eq('id', id);
+      const { error, count } = await requireSupabaseClient().from(ProductRepository.TABLE).delete({ count: 'exact' }).eq('id', id);
       // 23503 = violação de chave estrangeira (order_items.product_id → products.id).
-      if (error?.code === '23503') throw new HttpError(409, IN_USE_MESSAGE);
+      if (error?.code === '23503') throw new ConflictError(PRODUCT_IN_USE_MESSAGE);
       if (error) throw error;
       return Boolean(count);
     }
 
-    const db = ensureDatabaseFile();
-    const products = db.products;
+    const products = this.readLocal();
     const index = products.findIndex((product) => product.id === id);
     if (index === -1) return false;
 
-    // Mantém o mesmo comportamento da chave estrangeira do PostgreSQL no modo local.
-    if (db.orders.some((order) => order.items.some((item) => item.productId === id))) {
-      throw new HttpError(409, IN_USE_MESSAGE);
-    }
-
     products.splice(index, 1);
-    persistLocal(products);
+    this.writeLocal(products);
     return true;
   }
-};
+}

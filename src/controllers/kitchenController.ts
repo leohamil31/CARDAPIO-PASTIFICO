@@ -1,21 +1,23 @@
 import { Request, Response } from 'express';
-import { orderRepository } from '../repositories/orderRepository';
+import { OrderService } from '../services/OrderService';
 import { asyncHandler } from '../middlewares/asyncHandler';
-import { HttpError } from '../middlewares/errorHandler';
+import { HttpError } from '../errors/HttpError';
 import { getIdParam } from '../utils/params';
 
-export const listKitchenOrders = asyncHandler(async (_req: Request, res: Response): Promise<void> => {
-  res.status(200).json(await orderRepository.findForKitchen());
-});
+/** Controller do painel da cozinha (pedidos em aberto e pedidos por mesa). */
+export class KitchenController {
+  constructor(private readonly service: OrderService) {}
 
-export const listTableOrders = asyncHandler(async (req: Request, res: Response): Promise<void> => {
-  const raw = getIdParam(req.params.tableNumber);
-  const tableNumber = Number(raw);
+  openOrders = asyncHandler(async (_req: Request, res: Response): Promise<void> => {
+    res.status(200).json(await this.service.listForKitchen());
+  });
 
-  // Aceita só inteiros positivos ("5"); rejeita "abc", "0", "-1" e "5.5".
-  if (!/^\d+$/.test(raw) || !Number.isInteger(tableNumber) || tableNumber < 1) {
-    throw new HttpError(400, 'Número da mesa é inválido.');
-  }
+  tableOrders = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const raw = getIdParam(req.params.tableNumber);
 
-  res.status(200).json(await orderRepository.findByTable(tableNumber));
-});
+    // Aceita só inteiros positivos ("5"); rejeita "abc", "0", "-1" e "5.5".
+    if (!/^\d+$/.test(raw)) throw new HttpError(400, 'Número da mesa é inválido.');
+
+    res.status(200).json(await this.service.listByTable(Number(raw)));
+  });
+}

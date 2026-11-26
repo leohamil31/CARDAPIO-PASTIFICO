@@ -1,14 +1,8 @@
 import { NextFunction, Request, Response } from 'express';
+import { HttpError } from '../errors/HttpError';
 
-export class HttpError extends Error {
-  public readonly statusCode: number;
-
-  constructor(statusCode: number, message: string) {
-    super(message);
-    this.name = 'HttpError';
-    this.statusCode = statusCode;
-  }
-}
+// Reexportado para manter compatibilidade com imports antigos.
+export { HttpError };
 
 /** Erros lançados pelo body-parser do Express (`express.json()`). */
 interface BodyParserError extends Error {

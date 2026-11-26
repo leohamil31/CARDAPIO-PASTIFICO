@@ -1,17 +1,15 @@
-import './setup';
-import { describe, test } from 'node:test';
-import assert from 'node:assert/strict';
-import { api, createCategory, createProduct, findSeedProduct, UNKNOWN_ID, unique, UUID_REGEX } from './helpers';
+import { describe, test, expect } from 'vitest';
+import { api, createCategory, createProduct, findSeedProduct, UNKNOWN_ID, unique, UUID_REGEX } from '../helpers';
 
 describe('Produtos', () => {
   describe('GET /products', () => {
     test('retorna 200 com o cardápio e URLs de imagem válidas', async () => {
       const response = await api().get('/products');
 
-      assert.equal(response.status, 200);
-      assert.ok(Array.isArray(response.body));
-      assert.ok(response.body.length >= 8);
-      assert.ok(response.body.every((product: { image: string }) => product.image.startsWith('http') || product.image.startsWith('/')));
+      expect(response.status).toBe(200);
+      expect(Array.isArray(response.body)).toBeTruthy();
+      expect(response.body.length >= 8).toBeTruthy();
+      expect(response.body.every((product: { image: string }) => product.image.startsWith('http') || product.image.startsWith('/'))).toBeTruthy();
     });
   });
 
@@ -20,18 +18,18 @@ describe('Produtos', () => {
       const carbonara = await findSeedProduct('Spaghetti Carbonara');
       const response = await api().get(`/products/${carbonara.id}`);
 
-      assert.equal(response.status, 200);
-      assert.equal(response.body.name, 'Spaghetti Carbonara');
+      expect(response.status).toBe(200);
+      expect(response.body.name).toBe('Spaghetti Carbonara');
     });
 
     test('retorna 404 para id inexistente', async () => {
       const response = await api().get(`/products/${UNKNOWN_ID}`);
-      assert.equal(response.status, 404);
+      expect(response.status).toBe(404);
     });
 
     test('retorna 400 para id inválido', async () => {
       const response = await api().get('/products/xyz');
-      assert.equal(response.status, 400);
+      expect(response.status).toBe(400);
     });
   });
 
@@ -47,38 +45,38 @@ describe('Produtos', () => {
         categoryId: category.body.id
       });
 
-      assert.equal(response.status, 201);
-      assert.equal(response.body.name, name);
-      assert.equal(response.body.price, 36.5);
-      assert.equal(response.body.isAvailable, true, 'isAvailable deve ser true por padrão');
-      assert.equal(response.body.categoryId, category.body.id);
-      assert.match(response.body.id, UUID_REGEX);
+      expect(response.status).toBe(201);
+      expect(response.body.name).toBe(name);
+      expect(response.body.price).toBe(36.5);
+      expect(response.body.isAvailable, 'isAvailable deve ser true por padrão').toBe(true);
+      expect(response.body.categoryId).toBe(category.body.id);
+      expect(response.body.id).toMatch(UUID_REGEX);
     });
 
     test('retorna 400 listando os campos ausentes', async () => {
       const response = await api().post('/products').send({ name: 'Incompleto' });
-      assert.equal(response.status, 400);
-      assert.match(response.body.message, /description/);
-      assert.match(response.body.message, /categoryId/);
+      expect(response.status).toBe(400);
+      expect(response.body.message).toMatch(/description/);
+      expect(response.body.message).toMatch(/categoryId/);
     });
 
     test('retorna 400 para preço negativo ou não numérico', async () => {
       for (const price of [-1, 'abc', null]) {
         const response = await createProduct({ price });
-        assert.equal(response.status, 400, `preço ${String(price)} deveria ser rejeitado`);
+        expect(response.status, `preço ${String(price)} deveria ser rejeitado`).toBe(400);
       }
     });
 
     test('retorna 400 para isAvailable que não é booleano', async () => {
       const response = await createProduct({ isAvailable: 'talvez' });
-      assert.equal(response.status, 400);
+      expect(response.status).toBe(400);
     });
 
     test('retorna 400 para imagem com esquema perigoso (javascript:, data:)', async () => {
       for (const image of ['javascript:alert(1)', 'data:text/html,<b>x</b>', '//evil.example/x.jpg']) {
         const response = await createProduct({ image });
-        assert.equal(response.status, 400, image);
-        assert.match(response.body.message, /image/);
+        expect(response.status, image).toBe(400);
+        expect(response.body.message).toMatch(/image/);
       }
     });
 
@@ -86,17 +84,17 @@ describe('Produtos', () => {
       const invalid = await api().post('/products').send({
         name: unique('P'), description: 'd', price: 1, image: '/i.jpg', categoryId: 'massas'
       });
-      assert.equal(invalid.status, 400);
+      expect(invalid.status).toBe(400);
 
       const missing = await createProduct({ categoryId: UNKNOWN_ID });
-      assert.equal(missing.status, 400);
-      assert.match(missing.body.message, /categoria/i);
+      expect(missing.status).toBe(400);
+      expect(missing.body.message).toMatch(/categoria/i);
     });
 
     test('retorna 409 para nome duplicado', async () => {
       const created = await createProduct();
       const response = await createProduct({ name: created.body.name });
-      assert.equal(response.status, 409);
+      expect(response.status).toBe(409);
     });
   });
 
@@ -105,10 +103,10 @@ describe('Produtos', () => {
       const created = await createProduct();
       const response = await api().put(`/products/${created.body.id}`).send({ price: 52.9, isAvailable: false });
 
-      assert.equal(response.status, 200);
-      assert.equal(response.body.price, 52.9);
-      assert.equal(response.body.isAvailable, false);
-      assert.equal(response.body.name, created.body.name);
+      expect(response.status).toBe(200);
+      expect(response.body.price).toBe(52.9);
+      expect(response.body.isAvailable).toBe(false);
+      expect(response.body.name).toBe(created.body.name);
     });
 
     test('ignora campos protegidos (id e createdAt) e campos desconhecidos', async () => {
@@ -120,11 +118,11 @@ describe('Produtos', () => {
         description: 'Nova descrição'
       });
 
-      assert.equal(response.status, 200);
-      assert.equal(response.body.id, created.body.id);
-      assert.equal(response.body.createdAt, created.body.createdAt);
-      assert.equal(response.body.hacker, undefined);
-      assert.equal(response.body.description, 'Nova descrição');
+      expect(response.status).toBe(200);
+      expect(response.body.id).toBe(created.body.id);
+      expect(response.body.createdAt).toBe(created.body.createdAt);
+      expect(response.body.hacker).toBeUndefined();
+      expect(response.body.description).toBe('Nova descrição');
     });
 
     test('permite trocar de categoria quando ela existe', async () => {
@@ -132,27 +130,27 @@ describe('Produtos', () => {
       const otherCategory = await createCategory();
       const response = await api().put(`/products/${created.body.id}`).send({ categoryId: otherCategory.body.id });
 
-      assert.equal(response.status, 200);
-      assert.equal(response.body.categoryId, otherCategory.body.id);
+      expect(response.status).toBe(200);
+      expect(response.body.categoryId).toBe(otherCategory.body.id);
     });
 
     test('retorna 400 sem campos válidos, com preço inválido ou categoria inexistente', async () => {
       const created = await createProduct();
 
-      assert.equal((await api().put(`/products/${created.body.id}`).send({})).status, 400);
-      assert.equal((await api().put(`/products/${created.body.id}`).send({ price: -5 })).status, 400);
-      assert.equal((await api().put(`/products/${created.body.id}`).send({ categoryId: UNKNOWN_ID })).status, 400);
+      expect((await api().put(`/products/${created.body.id}`).send({})).status).toBe(400);
+      expect((await api().put(`/products/${created.body.id}`).send({ price: -5 })).status).toBe(400);
+      expect((await api().put(`/products/${created.body.id}`).send({ categoryId: UNKNOWN_ID })).status).toBe(400);
     });
 
     test('retorna 409 ao renomear para um nome já existente', async () => {
       const created = await createProduct();
       const response = await api().put(`/products/${created.body.id}`).send({ name: 'Tiramisu' });
-      assert.equal(response.status, 409);
+      expect(response.status).toBe(409);
     });
 
     test('retorna 404 para id inexistente e 400 para id inválido', async () => {
-      assert.equal((await api().put(`/products/${UNKNOWN_ID}`).send({ price: 1 })).status, 404);
-      assert.equal((await api().put('/products/1').send({ price: 1 })).status, 400);
+      expect((await api().put(`/products/${UNKNOWN_ID}`).send({ price: 1 })).status).toBe(404);
+      expect((await api().put('/products/1').send({ price: 1 })).status).toBe(400);
     });
   });
 
@@ -160,8 +158,8 @@ describe('Produtos', () => {
     test('remove o produto (204) e depois retorna 404', async () => {
       const created = await createProduct();
 
-      assert.equal((await api().delete(`/products/${created.body.id}`)).status, 204);
-      assert.equal((await api().get(`/products/${created.body.id}`)).status, 404);
+      expect((await api().delete(`/products/${created.body.id}`)).status).toBe(204);
+      expect((await api().get(`/products/${created.body.id}`)).status).toBe(404);
     });
 
     test('retorna 409 quando o produto já aparece em um pedido', async () => {
@@ -171,15 +169,15 @@ describe('Produtos', () => {
         tableNumber: 1,
         items: [{ productId: created.body.id, quantity: 1 }]
       });
-      assert.equal(order.status, 201);
+      expect(order.status).toBe(201);
 
       const response = await api().delete(`/products/${created.body.id}`);
-      assert.equal(response.status, 409);
+      expect(response.status).toBe(409);
     });
 
     test('retorna 404 para id inexistente e 400 para id inválido', async () => {
-      assert.equal((await api().delete(`/products/${UNKNOWN_ID}`)).status, 404);
-      assert.equal((await api().delete('/products/abc')).status, 400);
+      expect((await api().delete(`/products/${UNKNOWN_ID}`)).status).toBe(404);
+      expect((await api().delete('/products/abc')).status).toBe(400);
     });
   });
 });

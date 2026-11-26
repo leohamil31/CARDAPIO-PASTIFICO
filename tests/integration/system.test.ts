@@ -1,12 +1,10 @@
-import './setup';
-import { describe, test } from 'node:test';
-import assert from 'node:assert/strict';
+import { describe, test, expect } from 'vitest';
 import fs from 'node:fs';
 import type { NextFunction, Request, Response } from 'express';
-import { api } from './helpers';
-import { ensureDatabaseFile, saveDatabase, PersistedDatabase } from '../src/config/localDatabase';
-import { errorHandler, HttpError } from '../src/middlewares/errorHandler';
-import { escapeLikePattern } from '../src/utils/text';
+import { api } from '../helpers';
+import { ensureDatabaseFile, saveDatabase, PersistedDatabase } from '../../src/config/localDatabase';
+import { errorHandler, HttpError } from '../../src/middlewares/errorHandler';
+import { escapeLikePattern } from '../../src/utils/text';
 
 /** Resposta falsa mínima para testar o errorHandler isoladamente. */
 const fakeResponse = () => {
@@ -34,40 +32,40 @@ describe('Sistema', () => {
   test('GET /api/health informa persistência local nos testes', async () => {
     const response = await api().get('/api/health');
 
-    assert.equal(response.status, 200);
-    assert.equal(response.body.persistence, 'local-json');
-    assert.ok(response.body.endpoints.includes('POST /orders'));
+    expect(response.status).toBe(200);
+    expect(response.body.persistence).toBe('local-json');
+    expect(response.body.endpoints.includes('POST /orders')).toBeTruthy();
   });
 
   test('GET /api-docs/openapi.json retorna a especificação OpenAPI com todas as rotas', async () => {
     const response = await api().get('/api-docs/openapi.json');
 
-    assert.equal(response.status, 200);
-    assert.equal(response.body.openapi, '3.0.3');
+    expect(response.status).toBe(200);
+    expect(response.body.openapi).toBe('3.0.3');
     for (const path of ['/categories', '/categories/{id}', '/products', '/products/{id}', '/orders', '/orders/{id}', '/orders/{id}/status']) {
-      assert.ok(response.body.paths[path], `rota ${path} ausente na documentação`);
+      expect(response.body.paths[path], `rota ${path} ausente na documentação`).toBeTruthy();
     }
-    assert.match(response.body.info.description, /Leonardo Hamilton Moreira de Camargo/);
+    expect(response.body.info.description).toMatch(/Leonardo Hamilton Moreira de Camargo/);
   });
 
   test('GET /api-docs retorna a página do Swagger UI', async () => {
     const response = await api().get('/api-docs');
 
-    assert.equal(response.status, 200);
-    assert.match(response.headers['content-type'], /html/);
-    assert.match(response.text, /swagger-ui/);
+    expect(response.status).toBe(200);
+    expect(response.headers['content-type']).toMatch(/html/);
+    expect(response.text).toMatch(/swagger-ui/);
   });
 
   test('com KITCHEN_PIN definido, rotas da equipe exigem o cabeçalho x-kitchen-pin', async () => {
     process.env.KITCHEN_PIN = '4321';
     try {
-      assert.equal((await api().get('/orders')).status, 401);
-      assert.equal((await api().get('/orders').set('x-kitchen-pin', '0000')).status, 401);
-      assert.equal((await api().get('/orders').set('x-kitchen-pin', '4321')).status, 200);
-      assert.equal((await api().get('/kitchen')).status, 401);
-      assert.equal((await api().post('/categories').send({ name: 'x', description: 'y' })).status, 401);
+      expect((await api().get('/orders')).status).toBe(401);
+      expect((await api().get('/orders').set('x-kitchen-pin', '0000')).status).toBe(401);
+      expect((await api().get('/orders').set('x-kitchen-pin', '4321')).status).toBe(200);
+      expect((await api().get('/kitchen')).status).toBe(401);
+      expect((await api().post('/categories').send({ name: 'x', description: 'y' })).status).toBe(401);
       // O cardápio continua público para o cliente.
-      assert.equal((await api().get('/products')).status, 200);
+      expect((await api().get('/products')).status).toBe(200);
     } finally {
       delete process.env.KITCHEN_PIN;
     }
@@ -76,24 +74,24 @@ describe('Sistema', () => {
   test('respostas trazem cabeçalhos básicos de segurança', async () => {
     const response = await api().get('/api/health');
 
-    assert.equal(response.headers['x-content-type-options'], 'nosniff');
-    assert.equal(response.headers['x-frame-options'], 'DENY');
-    assert.equal(response.headers['x-powered-by'], undefined);
+    expect(response.headers['x-content-type-options']).toBe('nosniff');
+    expect(response.headers['x-frame-options']).toBe('DENY');
+    expect(response.headers['x-powered-by']).toBeUndefined();
   });
 
   test('páginas do front-end respondem 200', async () => {
     for (const path of ['/', '/kitchen-dashboard', '/order-status', '/order-history']) {
       const response = await api().get(path);
-      assert.equal(response.status, 200, path);
-      assert.match(response.text, /Pastifico/i);
+      expect(response.status, path).toBe(200);
+      expect(response.text).toMatch(/Pastifico/i);
     }
   });
 
   test('rota inexistente retorna 404 em JSON', async () => {
     const response = await api().get('/rota-que-nao-existe');
 
-    assert.equal(response.status, 404);
-    assert.match(response.body.message, /Rota não encontrada/);
+    expect(response.status).toBe(404);
+    expect(response.body.message).toMatch(/Rota não encontrada/);
   });
 
   test('ensureDatabaseFile remove categorias/produtos duplicados e normaliza imagens', () => {
@@ -113,9 +111,9 @@ describe('Sistema', () => {
     saveDatabase(stale);
 
     const normalized = ensureDatabaseFile();
-    assert.equal(normalized.categories.length, 1);
-    assert.equal(normalized.products.length, 1);
-    assert.ok(normalized.products[0].image.startsWith('http'));
+    expect(normalized.categories.length).toBe(1);
+    expect(normalized.products.length).toBe(1);
+    expect(normalized.products[0].image.startsWith('http')).toBeTruthy();
 
     saveDatabase(before);
   });
@@ -125,7 +123,7 @@ describe('Sistema', () => {
     fs.writeFileSync(process.env.PASTIFICO_DB_PATH as string, '{ corrompido', 'utf8');
 
     const recovered = ensureDatabaseFile();
-    assert.ok(recovered.categories.length >= 4);
+    expect(recovered.categories.length >= 4).toBeTruthy();
 
     saveDatabase(before);
   });
@@ -134,19 +132,19 @@ describe('Sistema', () => {
 describe('errorHandler', () => {
   test('usa o status do HttpError', () => {
     const result = runErrorHandler(new HttpError(418, 'Sou um bule.'));
-    assert.deepEqual(result, { status: 418, body: { message: 'Sou um bule.' } });
+    expect(result).toEqual({ status: 418, body: { message: 'Sou um bule.' } });
   });
 
   test('converte erros do PostgreSQL em 409/400', () => {
-    assert.equal(runErrorHandler({ code: '23505', message: 'duplicate key' }).status, 409);
-    assert.equal(runErrorHandler({ code: '23503', message: 'foreign key' }).status, 409);
-    assert.equal(runErrorHandler({ code: '22P02', message: 'invalid uuid' }).status, 400);
-    assert.equal(runErrorHandler({ code: '23514', message: 'check' }).status, 400);
+    expect(runErrorHandler({ code: '23505', message: 'duplicate key' }).status).toBe(409);
+    expect(runErrorHandler({ code: '23503', message: 'foreign key' }).status).toBe(409);
+    expect(runErrorHandler({ code: '22P02', message: 'invalid uuid' }).status).toBe(400);
+    expect(runErrorHandler({ code: '23514', message: 'check' }).status).toBe(400);
   });
 
   test('respeita erros 4xx do body-parser', () => {
-    assert.equal(runErrorHandler({ type: 'entity.too.large', status: 413, message: 'too large' }).status, 413);
-    assert.equal(runErrorHandler({ status: 415, message: 'unsupported charset' }).status, 415);
+    expect(runErrorHandler({ type: 'entity.too.large', status: 413, message: 'too large' }).status).toBe(413);
+    expect(runErrorHandler({ status: 415, message: 'unsupported charset' }).status).toBe(415);
   });
 
   test('erro inesperado vira 500 sem vazar detalhes internos', () => {
@@ -154,9 +152,9 @@ describe('errorHandler', () => {
     console.error = () => undefined;
     try {
       const result = runErrorHandler(new Error('senha do banco: 123'));
-      assert.equal(result.status, 500);
-      assert.equal(result.body?.message, 'Erro interno do servidor.');
-      assert.equal(runErrorHandler('texto qualquer').status, 500);
+      expect(result.status).toBe(500);
+      expect(result.body?.message).toBe('Erro interno do servidor.');
+      expect(runErrorHandler('texto qualquer').status).toBe(500);
     } finally {
       console.error = originalConsoleError;
     }
@@ -165,6 +163,6 @@ describe('errorHandler', () => {
 
 describe('utils', () => {
   test('escapeLikePattern escapa curingas do ILIKE', () => {
-    assert.equal(escapeLikePattern('100%_massa\\'), '100\\%\\_massa\\\\');
+    expect(escapeLikePattern('100%_massa\\')).toBe('100\\%\\_massa\\\\');
   });
 });

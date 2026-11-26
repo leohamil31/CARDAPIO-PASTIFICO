@@ -67,6 +67,7 @@ app.get('/api/health', async (_req, res) => {
       'GET /orders',
       'GET /orders/:id',
       'POST /orders',
+      'PUT /orders/:id',
       'PATCH /orders/:id/status',
       'DELETE /orders/:id',
       'GET /orders/kitchen',
