@@ -170,6 +170,26 @@ export const openApiSpec = {
           404: error('Pedido não encontrado')
         }
       },
+      put: {
+        tags: ['Pedidos'],
+        summary: 'Atualiza um pedido (somente enquanto o status é Recebido)',
+        description: 'Atualização parcial: envie apenas os campos que deseja alterar. Se `items` for enviado, os itens são substituídos e o total é recalculado no servidor.',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: ref('OrderUpdateInput'),
+              example: { tableNumber: 7, paymentMethod: 'PIX', items: [{ productId: '4ace3d9a-90f9-44fc-956f-b7a83bdda1ad', quantity: 2, options: ['Bacon crocante'] }] }
+            }
+          }
+        },
+        responses: {
+          200: { description: 'Pedido atualizado', content: json(ref('Order')) },
+          400: error('Dados inválidos, nenhum campo informado ou id não é UUID'),
+          404: error('Pedido não encontrado'),
+          409: error('Pedido já saiu do status Recebido e não pode mais ser alterado')
+        }
+      },
       delete: {
         tags: ['Pedidos'],
         summary: 'Remove um pedido (e seus itens)',
@@ -321,6 +341,16 @@ export const openApiSpec = {
               }
             }
           }
+        }
+      },
+      OrderUpdateInput: {
+        type: 'object',
+        minProperties: 1,
+        properties: {
+          customerName: { type: 'string', maxLength: 100, example: 'Maria' },
+          tableNumber: { type: 'integer', minimum: 1, example: 7 },
+          paymentMethod: ref('PaymentMethod'),
+          items: { $ref: '#/components/schemas/OrderInput/properties/items' }
         }
       }
     }

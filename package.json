@@ -8,8 +8,11 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit -p tsconfig.test.json",
-    "test": "tsx --test \"tests/**/*.test.ts\"",
-    "test:coverage": "tsx --test --enable-source-maps --experimental-test-coverage --test-coverage-include=\"src/**/*.ts\" --test-coverage-lines=60 \"tests/**/*.test.ts\"",
+    "test": "vitest run",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "migrate:supabase": "tsx scripts/migrate-json-to-supabase.ts"
   },
   "keywords": [
@@ -36,7 +39,7 @@
   },
   "license": "MIT",
   "engines": {
-    "node": ">=22.8"
+    "node": ">=20"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",
@@ -47,9 +50,11 @@
     "@types/express": "^5.0.0",
     "@types/node": "^24.0.0",
     "@types/supertest": "^7.2.1",
+    "@vitest/coverage-v8": "^3.2.4",
     "supertest": "^7.2.2",
     "tsx": "^4.23.13",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
   },
   "homepage": "https://leohamil31.github.io/CARDAPIO-PASTIFICO/"
 }

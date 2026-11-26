@@ -1,5 +1,5 @@
 import { NextFunction, Request, Response } from 'express';
-import { HttpError } from '../middlewares/errorHandler';
+import { HttpError } from '../errors/HttpError';
 import { isValidUuid } from './uuid';
 
 type Body = Record<string, unknown>;

@@ -1,80 +1,57 @@
 import { Request, Response } from 'express';
-import { orderRepository, OrderItemInput } from '../repositories/orderRepository';
+import { OrderService, UpdateOrderInput } from '../services/OrderService';
 import { asyncHandler } from '../middlewares/asyncHandler';
-import { HttpError } from '../middlewares/errorHandler';
+import { HttpError } from '../errors/HttpError';
 import { getIdParam } from '../utils/params';
 import { getBody, requirePositiveInteger, requireString } from '../utils/validation';
-import { OrderStatus, PaymentMethod } from '../models/Order';
 
-const VALID_STATUSES: readonly OrderStatus[] = ['Recebido', 'Preparando', 'Pronto', 'Entregue'];
-const VALID_PAYMENT_METHODS: readonly PaymentMethod[] = ['PIX', 'Cartão', 'Dinheiro'];
-const MAX_ITEMS_PER_ORDER = 50;
+/** Controller de pedidos: valida a entrada HTTP e delega as regras ao `OrderService`. */
+export class OrderController {
+  constructor(private readonly service: OrderService) {}
 
-const isOrderStatus = (value: unknown): value is OrderStatus =>
-  typeof value === 'string' && (VALID_STATUSES as readonly string[]).includes(value);
+  index = asyncHandler(async (_req: Request, res: Response): Promise<void> => {
+    res.status(200).json(await this.service.list());
+  });
 
-const isPaymentMethod = (value: unknown): value is PaymentMethod =>
-  typeof value === 'string' && (VALID_PAYMENT_METHODS as readonly string[]).includes(value);
+  show = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    res.status(200).json(await this.service.getById(getIdParam(req.params.id)));
+  });
 
-export const listOrders = asyncHandler(async (_req: Request, res: Response): Promise<void> => {
-  res.status(200).json(await orderRepository.findAll());
-});
+  store = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const body = getBody(req);
 
-export const storeOrder = asyncHandler(async (req: Request, res: Response): Promise<void> => {
-  const body = getBody(req);
-  const { items, paymentMethod = 'Dinheiro' } = body;
+    if (body.customerName === undefined || body.tableNumber === undefined || body.items === undefined) {
+      throw new HttpError(400, 'Nome do cliente, número da mesa e itens são obrigatórios.');
+    }
 
-  if (body.customerName === undefined || body.tableNumber === undefined || items === undefined) {
-    throw new HttpError(400, 'Nome do cliente, número da mesa e itens são obrigatórios.');
-  }
+    const order = await this.service.create({
+      customerName: requireString(body.customerName, 'customerName', 100),
+      tableNumber: requirePositiveInteger(body.tableNumber, 'tableNumber'),
+      items: body.items,
+      paymentMethod: body.paymentMethod
+    });
+    res.status(201).json(order);
+  });
 
-  const customerName = requireString(body.customerName, 'customerName', 100);
-  const tableNumber = requirePositiveInteger(body.tableNumber, 'tableNumber');
+  update = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const body = getBody(req);
+    const input: UpdateOrderInput = {};
 
-  if (!Array.isArray(items) || items.length === 0) {
-    throw new HttpError(400, 'O pedido deve ter ao menos um item (items deve ser uma lista).');
-  }
+    if (body.customerName !== undefined) input.customerName = requireString(body.customerName, 'customerName', 100);
+    if (body.tableNumber !== undefined) input.tableNumber = requirePositiveInteger(body.tableNumber, 'tableNumber');
+    if (body.paymentMethod !== undefined) input.paymentMethod = body.paymentMethod;
+    if (body.items !== undefined) input.items = body.items;
 
-  if (items.length > MAX_ITEMS_PER_ORDER) {
-    throw new HttpError(400, `O pedido pode ter no máximo ${MAX_ITEMS_PER_ORDER} itens.`);
-  }
+    res.status(200).json(await this.service.update(getIdParam(req.params.id), input));
+  });
 
-  if (!isPaymentMethod(paymentMethod)) {
-    throw new HttpError(400, `Método de pagamento inválido. Use: ${VALID_PAYMENT_METHODS.join(', ')}.`);
-  }
+  updateStatus = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const { status } = getBody(req);
+    res.status(200).json(await this.service.updateStatus(getIdParam(req.params.id), status));
+  });
 
-  // Erros de validação dos itens chegam como HttpError(400) do repository;
-  // falhas inesperadas (ex.: banco fora do ar) seguem para o errorHandler como 500.
-  const order = await orderRepository.create(customerName, tableNumber, items as OrderItemInput[], paymentMethod);
-  res.status(201).json(order);
-});
-
-export const showOrder = asyncHandler(async (req: Request, res: Response): Promise<void> => {
-  const order = await orderRepository.findById(getIdParam(req.params.id));
-
-  if (!order) throw new HttpError(404, 'Pedido não encontrado.');
-
-  res.status(200).json(order);
-});
-
-export const updateOrderStatusController = asyncHandler(async (req: Request, res: Response): Promise<void> => {
-  const { status } = getBody(req);
-
-  if (!isOrderStatus(status)) {
-    throw new HttpError(400, `Status do pedido inválido. Use: ${VALID_STATUSES.join(', ')}.`);
-  }
-
-  const order = await orderRepository.updateStatus(getIdParam(req.params.id), status);
-
-  if (!order) throw new HttpError(404, 'Pedido não encontrado.');
-
-  res.status(200).json(order);
-});
-
-export const destroyOrder = asyncHandler(async (req: Request, res: Response): Promise<void> => {
-  const removed = await orderRepository.remove(getIdParam(req.params.id));
-
-  if (!removed) throw new HttpError(404, 'Pedido não encontrado.');
-
-  res.status(204).send();
-});
+  destroy = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    await this.service.remove(getIdParam(req.params.id));
+    res.status(204).send();
+  });
+}

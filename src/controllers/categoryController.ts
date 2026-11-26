@@ -1,55 +1,47 @@
 import { Request, Response } from 'express';
-import { categoryRepository } from '../repositories/categoryRepository';
+import { CategoryService } from '../services/CategoryService';
+import { CategoryChanges } from '../repositories/categoryRepository';
 import { asyncHandler } from '../middlewares/asyncHandler';
-import { HttpError } from '../middlewares/errorHandler';
 import { getIdParam } from '../utils/params';
 import { getBody, optionalString, requireString } from '../utils/validation';
 
-export const listCategories = asyncHandler(async (_req: Request, res: Response): Promise<void> => {
-  res.status(200).json(await categoryRepository.findAll());
-});
+/**
+ * Controller de categorias: lê e valida o formato da requisição HTTP,
+ * chama o `CategoryService` e devolve o código de status adequado.
+ */
+export class CategoryController {
+  constructor(private readonly service: CategoryService) {}
 
-export const showCategory = asyncHandler(async (req: Request, res: Response): Promise<void> => {
-  const category = await categoryRepository.findById(getIdParam(req.params.id));
+  index = asyncHandler(async (_req: Request, res: Response): Promise<void> => {
+    res.status(200).json(await this.service.list());
+  });
 
-  if (!category) throw new HttpError(404, 'Categoria não encontrada.');
+  show = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    res.status(200).json(await this.service.getById(getIdParam(req.params.id)));
+  });
 
-  res.status(200).json(category);
-});
+  store = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const body = getBody(req);
+    const category = await this.service.create({
+      name: requireString(body.name, 'name', 100),
+      description: requireString(body.description, 'description', 500)
+    });
+    res.status(201).json(category);
+  });
 
-export const storeCategory = asyncHandler(async (req: Request, res: Response): Promise<void> => {
-  const body = getBody(req);
-  const name = requireString(body.name, 'name', 100);
-  const description = requireString(body.description, 'description', 500);
+  update = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const body = getBody(req);
+    const changes: CategoryChanges = {};
+    const name = optionalString(body.name, 'name', 100);
+    const description = optionalString(body.description, 'description', 500);
+    if (name !== undefined) changes.name = name;
+    if (description !== undefined) changes.description = description;
 
-  const category = await categoryRepository.create(name, description);
-  res.status(201).json(category);
-});
+    res.status(200).json(await this.service.update(getIdParam(req.params.id), changes));
+  });
 
-export const updateCategory = asyncHandler(async (req: Request, res: Response): Promise<void> => {
-  const body = getBody(req);
-  const name = optionalString(body.name, 'name', 100);
-  const description = optionalString(body.description, 'description', 500);
-
-  if (name === undefined && description === undefined) {
-    throw new HttpError(400, 'Informe ao menos um campo para atualizar (name ou description).');
-  }
-
-  const changes: Partial<{ name: string; description: string }> = {};
-  if (name !== undefined) changes.name = name;
-  if (description !== undefined) changes.description = description;
-
-  const category = await categoryRepository.update(getIdParam(req.params.id), changes);
-
-  if (!category) throw new HttpError(404, 'Categoria não encontrada.');
-
-  res.status(200).json(category);
-});
-
-export const destroyCategory = asyncHandler(async (req: Request, res: Response): Promise<void> => {
-  const removed = await categoryRepository.remove(getIdParam(req.params.id));
-
-  if (!removed) throw new HttpError(404, 'Categoria não encontrada.');
-
-  res.status(204).send();
-});
+  destroy = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    await this.service.remove(getIdParam(req.params.id));
+    res.status(204).send();
+  });
+}

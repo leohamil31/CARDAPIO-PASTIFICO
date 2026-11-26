@@ -33,6 +33,14 @@
     {
       "key": "tableNumber",
       "value": "5"
+    },
+    {
+      "key": "deleteProductId",
+      "value": ""
+    },
+    {
+      "key": "kitchenPin",
+      "value": ""
     }
   ],
   "item": [
@@ -630,6 +638,164 @@
       ]
     },
     {
+      "name": "DELETE Produtos",
+      "description": "Apaga um produto do cardápio pelo id. Antes de usar, preencha a variável da coleção deleteProductId com o id do produto (copie do 'Listar produtos'). Sem ela, as requisições são puladas, então o Runner nunca apaga nada do cardápio por engano. Se o servidor tiver KITCHEN_PIN definido, preencha também a variável kitchenPin.",
+      "item": [
+        {
+          "name": "Remover produto por ID",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const id = pm.collectionVariables.get('deleteProductId');",
+                  "if (!id) {",
+                  "  console.warn('Preencha a variável deleteProductId com o id do produto que quer apagar.');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 204 (produto removido)', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "x-kitchen-pin",
+                "value": "{{kitchenPin}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/products/{{deleteProductId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "{{deleteProductId}}"
+              ]
+            },
+            "description": "Remove o produto cujo id está em deleteProductId. Responde 204 sem corpo quando dá certo."
+          }
+        },
+        {
+          "name": "Confirmar remoção (GET deve dar 404)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get('deleteProductId')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Produto não existe mais (404)', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/{{deleteProductId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "{{deleteProductId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Erro - remover produto inexistente (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));",
+                  "pm.test('Mensagem de erro em JSON', () => pm.expect(pm.response.json()).to.have.property('message'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "x-kitchen-pin",
+                "value": "{{kitchenPin}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/products/00000000-0000-4000-8000-000000000000",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "00000000-0000-4000-8000-000000000000"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Erro - id inválido (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Mensagem de erro em JSON', () => pm.expect(pm.response.json()).to.have.property('message'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "x-kitchen-pin",
+                "value": "{{kitchenPin}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/products/abc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "abc"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "Pedidos",
       "item": [
         {
@@ -730,6 +896,54 @@
               }
             }
           ]
+        },
+        {
+          "name": "Atualizar pedido",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Mesa e pagamento atualizados', () => {",
+                  "  const order = pm.response.json();",
+                  "  pm.expect(order.tableNumber).to.eql(7);",
+                  "  pm.expect(order.paymentMethod).to.eql('Cartão');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/orders/{{orderId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders",
+                "{{orderId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tableNumber\": 7,\n  \"paymentMethod\": \"Cartão\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Atualiza um pedido enquanto o status é Recebido (regra de negócio). Campos aceitos: customerName, tableNumber, paymentMethod e items (os itens são substituídos e o total recalculado)."
+          }
         },
         {
           "name": "Atualizar status do pedido",
