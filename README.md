@@ -442,7 +442,18 @@ npm run test:coverage     # todos + relatório de cobertura
 
 O relatório de cobertura aparece no terminal e também em HTML em `coverage/index.html`. O comando falha se **linhas, instruções (statements), funções ou ramificações (branches)** ficarem abaixo de **60%**. Apenas `src/server.ts` (que só abre a porta HTTP) fica fora da medição. No GitHub, o workflow de CI roda os testes a cada push e publica o relatório como artefato `coverage-report`.
 
-**Cobertura alcançada:** COVERAGE_TABLE
+**Cobertura alcançada:**
+
+**175 testes** (92 unitários + 83 de integração), todos passando. Resultado de `npm run test:coverage` no CI:
+
+| Métrica | Cobertura | Mínimo exigido |
+|---|---|---|
+| Linhas (lines) | **97,95%** | 60% |
+| Instruções (statements) | **97,95%** | 60% |
+| Funções (functions) | **99,13%** | 60% |
+| Ramificações (branches) | **94,89%** | 60% |
+
+Por camada: `services` 100%, `controllers` 100%, `repositories` 100% das linhas (96,65% dos branches), `routes` 100%, `middlewares` 100%. A pasta `models` aparece com 0% porque contém apenas tipos TypeScript (`interface`), que não geram código executável.
 
 **Cuidados com o banco de dados nos testes:**
 - Os testes **nunca acessam o Supabase real**, mesmo com o `.env` preenchido: o `tests/setup.ts` desliga as variáveis do Supabase antes de cada arquivo de teste.
