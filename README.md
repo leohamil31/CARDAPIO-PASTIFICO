@@ -4,6 +4,24 @@
 
 Sistema de autoatendimento para um restaurante italiano (Pastifico), com catálogo de produtos, carrinho de pedidos, painel de cozinha e acompanhamento de status do pedido.
 
+## Acesso rápido (sem instalar nada)
+
+A API está publicada na Vercel e já conectada ao Supabase/PostgreSQL — dá para avaliar sem criar banco nem configurar nada:
+
+| O quê | Link |
+|---|---|
+| **API** (health check) | https://cardapio-pastifico.vercel.app/api/health |
+| **Swagger / OpenAPI** (testar as rotas no navegador) | https://cardapio-pastifico.vercel.app/api-docs |
+| **Produtos** (exemplo de GET) | https://cardapio-pastifico.vercel.app/products |
+| **Cardápio** (front-end) | https://leohamil31.github.io/CARDAPIO-PASTIFICO/ |
+
+**Postman em 3 passos:**
+1. No Postman: **Import → Files** e selecione os arquivos da pasta [`postman/`](./postman): `Pastifico API.postman_collection.json` e `Pastifico Online (Vercel).postman_environment.json`.
+2. No canto superior direito, selecione o ambiente **Pastifico Online (Vercel)**.
+3. Clique em **Send** em qualquer requisição — ou rode a coleção inteira em **Run collection**. Os ids são capturados automaticamente (comece por `Listar categorias` e `Listar produtos`).
+
+**Rodar na própria máquina:** `npm install` e `npm run dev` já funcionam **sem `.env`** — sem as variáveis do Supabase, a API usa um banco local em JSON com o mesmo cardápio (seção [7](#7-configuração-e-execução)). Para os testes: `npm run test:coverage`.
+
 ## Demonstração online (GitHub Pages)
 
 - **Cardápio:** https://leohamil31.github.io/CARDAPIO-PASTIFICO/
@@ -468,15 +486,15 @@ A especificação em JSON fica em `http://localhost:3000/api-docs/openapi.json` 
 
 ## Testar no Postman
 
-1. Inicie o servidor com `npm run dev`.
-2. Importe estes arquivos no Postman (**Import → Files**):
-   - `postman/Pastifico API.postman_collection.json`
-   - `postman/Pastifico Local.postman_environment.json`
-3. Selecione o ambiente **Pastifico Local**.
-4. Teste primeiro `Sistema → Health check`; a resposta esperada é `200 OK`.
-5. Rode `Categorias → Listar categorias` e `Produtos → Listar produtos` para capturar automaticamente os ids (uuid) reais nas variáveis `categoryId` e `productId` da coleção.
-6. A partir daí, as demais requisições já funcionam usando os ids capturados automaticamente.
-7. Para validar tudo de uma vez, use **Run collection** (Collection Runner): as requisições têm testes `pm.test` e devem passar na ordem das pastas.
+1. Importe no Postman (**Import → Files**) a coleção `postman/Pastifico API.postman_collection.json` e os ambientes:
+   - `postman/Pastifico Online (Vercel).postman_environment.json` — usa a **API publicada** (não precisa rodar nada);
+   - `postman/Pastifico Local.postman_environment.json` — usa o servidor local (`npm run dev`).
+2. Selecione o ambiente desejado no canto superior direito.
+3. Teste primeiro `Sistema → Health check`; a resposta esperada é `200 OK`.
+4. Rode `Categorias → Listar categorias` e `Produtos → Listar produtos` para capturar automaticamente os ids (uuid) reais nas variáveis `categoryId` e `productId` da coleção.
+5. A partir daí, as demais requisições já funcionam usando os ids capturados automaticamente.
+6. Para validar tudo de uma vez, use **Run collection** (Collection Runner): as requisições têm testes `pm.test` e devem passar na ordem das pastas. Os registros de teste criados pela coleção são removidos ao final.
+7. Se alguma rota da equipe responder `401`, o servidor tem `KITCHEN_PIN` definido: preencha a variável `kitchenPin` do ambiente — a coleção envia o cabeçalho `x-kitchen-pin` automaticamente.
 8. A pasta **DELETE Produtos** apaga um produto real pelo id: preencha a variável `deleteProductId` da coleção antes de usar (sem ela, as requisições são puladas).
 
 A coleção nunca altera ou remove itens reais do cardápio: o que ela cria fica em `createdCategoryId`/`createdProductId` (com nome único via `{{$timestamp}}`) e é removido ao final. Os ids ficam só nas variáveis da coleção — o ambiente **Pastifico Local** contém apenas `baseUrl` e `tableNumber`, porque variáveis de ambiente têm prioridade sobre as da coleção no Postman.

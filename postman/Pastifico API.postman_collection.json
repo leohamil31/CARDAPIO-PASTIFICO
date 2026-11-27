@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "c2c1e6fd-7c62-4be9-84d3-f4bdff664180",
     "name": "Pastifico API",
-    "description": "Requisições da Pastifico API (autor: Leonardo Hamilton Moreira de Camargo). Pode ser executada inteira pelo Collection Runner, na ordem das pastas: cada requisição tem testes automáticos (pm.test). Os ids reais do cardápio ficam em categoryId/productId; os registros criados pela coleção usam createdCategoryId/createdProductId e são removidos ao final, sem alterar o cardápio real. Documentação OpenAPI em {{baseUrl}}/api-docs.",
+    "description": "Requisições da Pastifico API (autor: Leonardo Hamilton Moreira de Camargo).\n\nComo usar: importe esta coleção e um dos ambientes da pasta postman/ e selecione o ambiente no canto superior direito:\n- 'Pastifico Online (Vercel)': usa a API já publicada (https://cardapio-pastifico.vercel.app), conectada ao Supabase. Não precisa instalar nem configurar nada.\n- 'Pastifico Local': usa o servidor local (npm run dev em http://localhost:3000).\n\nPode ser executada inteira pelo Collection Runner, na ordem das pastas: cada requisição tem testes automáticos (pm.test). Os ids reais do cardápio são capturados automaticamente em categoryId/productId; os registros criados pela coleção usam createdCategoryId/createdProductId e são removidos ao final, sem alterar o cardápio real. Se o servidor exigir PIN da equipe (401), preencha a variável kitchenPin do ambiente: ele é enviado automaticamente. Documentação OpenAPI em /api-docs.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -669,12 +669,7 @@
           ],
           "request": {
             "method": "DELETE",
-            "header": [
-              {
-                "key": "x-kitchen-pin",
-                "value": "{{kitchenPin}}"
-              }
-            ],
+            "header": [],
             "url": {
               "raw": "{{baseUrl}}/products/{{deleteProductId}}",
               "host": [
@@ -741,12 +736,7 @@
           ],
           "request": {
             "method": "DELETE",
-            "header": [
-              {
-                "key": "x-kitchen-pin",
-                "value": "{{kitchenPin}}"
-              }
-            ],
+            "header": [],
             "url": {
               "raw": "{{baseUrl}}/products/00000000-0000-4000-8000-000000000000",
               "host": [
@@ -775,12 +765,7 @@
           ],
           "request": {
             "method": "DELETE",
-            "header": [
-              {
-                "key": "x-kitchen-pin",
-                "value": "{{kitchenPin}}"
-              }
-            ],
+            "header": [],
             "url": {
               "raw": "{{baseUrl}}/products/abc",
               "host": [
@@ -1238,6 +1223,20 @@
           ]
         }
       ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Envia o PIN da equipe automaticamente em todas as requisições, se a variável kitchenPin estiver preenchida",
+          "// (necessário só quando o servidor tem KITCHEN_PIN definido).",
+          "const pin = pm.environment.get('kitchenPin') || pm.collectionVariables.get('kitchenPin');",
+          "if (pin) pm.request.headers.upsert({ key: 'x-kitchen-pin', value: pin });"
+        ]
+      }
     }
   ]
 }
