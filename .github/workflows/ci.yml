@@ -16,7 +16,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm install --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
       - run: npm run typecheck
       - run: npm run test:unit
       - run: npm run test:integration
@@ -29,9 +29,3 @@ jobs:
           name: coverage-report
           path: coverage/
           if-no-files-found: ignore
-      - name: Publicar package-lock.json atualizado
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: package-lock
-          path: package-lock.json
